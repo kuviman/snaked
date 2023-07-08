@@ -1,6 +1,7 @@
 tps = 5
 cell_margin = 0.1
 camera_margin = 2
+snake_vision = 5
 
 [colors]
 background = "black"
@@ -10,3 +11,4 @@ snake_tail = "#030"
 snake = ["#070", "#060", "#050", "#040", "#050", "#060"]
 wall = "white"
 hovered = "#7777"
+snake_vision = "#f003"

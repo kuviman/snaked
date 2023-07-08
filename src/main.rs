@@ -18,6 +18,7 @@ pub struct Colors {
     pub snake_tail: Rgba<f32>,
     pub snake: Vec<Rgba<f32>>,
     pub hovered: Rgba<f32>,
+    pub snake_vision: Rgba<f32>,
 }
 
 #[derive(geng::asset::Load, Deserialize)]
@@ -26,6 +27,7 @@ pub struct Config {
     pub tps: f64,
     pub cell_margin: f32,
     pub camera_margin: f32,
+    pub snake_vision: usize,
     pub colors: Colors,
 }
 

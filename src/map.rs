@@ -1,5 +1,7 @@
 use super::*;
 
+const DIRECTIONS: [vec2<isize>; 4] = [vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2(0, 1)];
+
 #[derive(Default)]
 pub enum MapCell {
     #[default]
@@ -15,6 +17,33 @@ pub struct Map {
 }
 
 impl Map {
+    pub fn diff(&self, a: vec2<usize>, b: vec2<usize>) -> vec2<isize> {
+        a.zip(b).zip(self.size()).map(|((a, b), size)| {
+            let a = a as isize;
+            let b = b as isize;
+            let size = size as isize;
+            (-1..=1)
+                .map(|x| a - b + size * x)
+                .min_by_key(|value| value.abs())
+                .unwrap()
+        })
+    }
+    pub fn distance(&self, a: vec2<usize>, b: vec2<usize>) -> usize {
+        let diff = self.diff(a, b);
+        (diff.x.abs() + diff.y.abs()) as usize
+    }
+    pub fn neighbors(&self, pos: vec2<usize>) -> impl Iterator<Item = vec2<usize>> + '_ {
+        DIRECTIONS
+            .into_iter()
+            .map(move |dir| self.add_dir(pos, dir))
+    }
+
+    pub fn add_dir(&self, pos: vec2<usize>, dir: vec2<isize>) -> vec2<usize> {
+        pos.zip(dir)
+            .zip(self.size())
+            .map(|((pos, dir), size)| (pos as isize + size as isize + dir) as usize % size)
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (vec2<usize>, &MapCell)> + '_ {
         self.cells.iter().enumerate().flat_map(|(x, row)| {
             row.iter()

@@ -1,19 +1,5 @@
 use super::*;
 
-const DIRECTIONS: [vec2<isize>; 4] = [vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2(0, 1)];
-
-fn neighbors(pos: vec2<usize>, map: &Map) -> impl Iterator<Item = vec2<usize>> + '_ {
-    DIRECTIONS
-        .into_iter()
-        .map(move |dir| add_dir(pos, map, dir))
-}
-
-pub fn add_dir(pos: vec2<usize>, map: &Map, dir: vec2<isize>) -> vec2<usize> {
-    pos.zip(dir)
-        .zip(map.size())
-        .map(|((pos, dir), size)| (pos as isize + size as isize + dir) as usize % size)
-}
-
 pub fn head(map: &Map) -> vec2<usize> {
     let (head_pos, _) = map
         .iter()
@@ -48,8 +34,8 @@ impl AiState {
     }
 }
 
-pub fn go_ai(map: &mut Map, state: &mut AiState) -> bool {
-    if let Some(pos) = find_closest_food(map) {
+pub fn go_ai(config: &Config, map: &mut Map, state: &mut AiState) -> bool {
+    if let Some(pos) = find_closest_food(config, map) {
         state.target_pos = Some(pos);
     } else if state.target_pos.is_none() {
         state.target_pos = Some(vec2(
@@ -64,7 +50,8 @@ pub fn go_ai(map: &mut Map, state: &mut AiState) -> bool {
         did_smth = go_to(map, tail_pos);
     }
     if !did_smth {
-        if let Some(next) = neighbors(head(map), map)
+        if let Some(next) = map
+            .neighbors(head(map))
             .filter(|&pos| matches!(map[pos], MapCell::Player(_) | MapCell::Empty))
             .choose(&mut thread_rng())
         {
@@ -76,7 +63,7 @@ pub fn go_ai(map: &mut Map, state: &mut AiState) -> bool {
     true
 }
 
-fn find_closest_food(map: &Map) -> Option<vec2<usize>> {
+fn find_closest_food(config: &Config, map: &Map) -> Option<vec2<usize>> {
     let head_pos = head(map);
     let mut d = vec![vec![None::<usize>; map.size().y]; map.size().x];
     let mut q = std::collections::VecDeque::new();
@@ -84,11 +71,12 @@ fn find_closest_food(map: &Map) -> Option<vec2<usize>> {
     q.push_back(head_pos);
     while let Some(pos) = q.pop_front() {
         let pos_d = d[pos.x][pos.y].unwrap();
-        for new_pos in neighbors(pos, map) {
-            match map[new_pos] {
-                MapCell::Wall | MapCell::SnakePart(_) => continue,
-                MapCell::Player(_) => return Some(new_pos),
-                _ => {}
+        if pos_d >= config.snake_vision {
+            continue;
+        }
+        for new_pos in map.neighbors(pos) {
+            if let MapCell::Player(_) = map[new_pos] {
+                return Some(new_pos);
             }
             if d[new_pos.x][new_pos.y].is_none() {
                 d[new_pos.x][new_pos.y] = Some(pos_d + 1);
@@ -111,7 +99,7 @@ pub fn go_to(map: &mut Map, to: vec2<usize>) -> bool {
     q.push_back(to);
     while let Some(pos) = q.pop_front() {
         let pos_d = d[pos.x][pos.y].unwrap();
-        for new_pos in neighbors(pos, map) {
+        for new_pos in map.neighbors(pos) {
             if let MapCell::Wall | MapCell::SnakePart(_) = map[new_pos] {
                 continue;
             }
@@ -122,7 +110,8 @@ pub fn go_to(map: &mut Map, to: vec2<usize>) -> bool {
         }
     }
 
-    if let Some(next) = neighbors(head_pos, map)
+    if let Some(next) = map
+        .neighbors(head_pos)
         .filter(|next| d[next.x][next.y].is_some())
         .min_by_key(|next| d[next.x][next.y].unwrap())
     {

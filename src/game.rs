@@ -61,7 +61,7 @@ impl geng::State for Game {
         self.next_tick -= delta_time;
         if self.next_tick < 0.0 {
             self.next_tick = 1.0 / self.ctx.assets.config.tps;
-            snake::go_ai(&mut self.map, &mut self.ai_state);
+            snake::go_ai(&self.ctx.assets.config, &mut self.map, &mut self.ai_state);
         }
     }
     fn handle_event(&mut self, event: geng::Event) {
@@ -139,6 +139,17 @@ impl geng::State for Game {
             _ => unreachable!(),
         };
         for (pos, cell) in self.map.iter() {
+            if self.map.distance(pos, snake_head) <= self.ctx.assets.config.snake_vision {
+                self.ctx.geng.draw2d().draw2d(
+                    framebuffer,
+                    &self.camera,
+                    &draw2d::Quad::new(
+                        Aabb2::point(pos.map(|x| x as f32)).extend_uniform(0.5),
+                        colors.snake_vision,
+                    ),
+                );
+            }
+
             let color = match *cell {
                 MapCell::Empty => continue,
                 MapCell::Wall => colors.wall,
@@ -162,16 +173,16 @@ impl geng::State for Game {
                 }
                 _ => false,
             };
-            if need_extend(snake::add_dir(pos, &self.map, vec2(-1, 0))) {
+            if need_extend(self.map.add_dir(pos, vec2(-1, 0))) {
                 aabb = aabb.extend_left(self.ctx.assets.config.cell_margin);
             }
-            if need_extend(snake::add_dir(pos, &self.map, vec2(1, 0))) {
+            if need_extend(self.map.add_dir(pos, vec2(1, 0))) {
                 aabb = aabb.extend_right(self.ctx.assets.config.cell_margin);
             }
-            if need_extend(snake::add_dir(pos, &self.map, vec2(0, -1))) {
+            if need_extend(self.map.add_dir(pos, vec2(0, -1))) {
                 aabb = aabb.extend_down(self.ctx.assets.config.cell_margin);
             }
-            if need_extend(snake::add_dir(pos, &self.map, vec2(0, 1))) {
+            if need_extend(self.map.add_dir(pos, vec2(0, 1))) {
                 aabb = aabb.extend_up(self.ctx.assets.config.cell_margin);
             }
             self.ctx.geng.draw2d().draw2d(
