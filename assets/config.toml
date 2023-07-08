@@ -1,5 +1,6 @@
 tps = 5
-margin = 2
+cell_margin = 0.1
+camera_margin = 2
 
 [colors]
 background = "black"

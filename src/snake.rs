@@ -3,11 +3,15 @@ use super::*;
 const DIRECTIONS: [vec2<isize>; 4] = [vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2(0, 1)];
 
 fn neighbors(pos: vec2<usize>, map: &Map) -> impl Iterator<Item = vec2<usize>> + '_ {
-    DIRECTIONS.into_iter().map(move |dir| {
-        pos.zip(dir)
-            .zip(map.size())
-            .map(|((pos, dir), size)| (pos as isize + size as isize + dir) as usize % size)
-    })
+    DIRECTIONS
+        .into_iter()
+        .map(move |dir| add_dir(pos, map, dir))
+}
+
+pub fn add_dir(pos: vec2<usize>, map: &Map, dir: vec2<isize>) -> vec2<usize> {
+    pos.zip(dir)
+        .zip(map.size())
+        .map(|((pos, dir), size)| (pos as isize + size as isize + dir) as usize % size)
 }
 
 pub fn head(map: &Map) -> vec2<usize> {

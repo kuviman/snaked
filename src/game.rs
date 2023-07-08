@@ -17,7 +17,7 @@ impl Game {
             camera: Camera2d {
                 center: map.size().map(|x| x as f32) / 2.0,
                 rotation: Angle::ZERO,
-                fov: map.size().y as f32 + ctx.assets.config.margin * 2.0,
+                fov: map.size().y as f32 + ctx.assets.config.camera_margin * 2.0,
             },
             map,
             next_tick: 0.0,
@@ -151,13 +151,31 @@ impl geng::State for Game {
                     }
                 }
             };
+            let mut aabb = Aabb2::point(pos.map(|x| x as f32))
+                .extend_uniform(0.5 - self.ctx.assets.config.cell_margin);
+            let need_extend = |next: vec2<usize>| match (cell, &self.map[next]) {
+                (MapCell::Wall, MapCell::Wall) => true,
+                (&MapCell::SnakePart(prev), &MapCell::SnakePart(next)) => {
+                    prev + 1 == next || next + 1 == prev
+                }
+                _ => false,
+            };
+            if need_extend(snake::add_dir(pos, &self.map, vec2(-1, 0))) {
+                aabb = aabb.extend_left(self.ctx.assets.config.cell_margin);
+            }
+            if need_extend(snake::add_dir(pos, &self.map, vec2(1, 0))) {
+                aabb = aabb.extend_right(self.ctx.assets.config.cell_margin);
+            }
+            if need_extend(snake::add_dir(pos, &self.map, vec2(0, -1))) {
+                aabb = aabb.extend_down(self.ctx.assets.config.cell_margin);
+            }
+            if need_extend(snake::add_dir(pos, &self.map, vec2(0, 1))) {
+                aabb = aabb.extend_up(self.ctx.assets.config.cell_margin);
+            }
             self.ctx.geng.draw2d().draw2d(
                 framebuffer,
                 &self.camera,
-                &draw2d::Quad::new(
-                    Aabb2::point(pos.map(|x| x as f32)).extend_uniform(0.5),
-                    color,
-                ),
+                &draw2d::Quad::new(aabb, color),
             );
         }
         if self.ctx.cli.editor {

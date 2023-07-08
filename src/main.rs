@@ -24,7 +24,8 @@ pub struct Colors {
 #[load(serde = "toml")]
 pub struct Config {
     pub tps: f64,
-    pub margin: f32,
+    pub cell_margin: f32,
+    pub camera_margin: f32,
     pub colors: Colors,
 }
 
