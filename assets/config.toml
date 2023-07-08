@@ -1,0 +1,7 @@
+margin = 2
+
+[colors]
+background = "black"
+player = "red"
+snake = "green"
+wall = "white"
