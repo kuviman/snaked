@@ -7,7 +7,9 @@ pub struct Game {
     ai_state: snake::AiState,
     camera: Camera2d,
     player_id: Option<Id>,
+    held_item: Option<Item>,
     next_tick: f64,
+    next_item: f64,
 }
 
 impl Game {
@@ -24,6 +26,8 @@ impl Game {
             map,
             ai_state: snake::AiState::new(),
             next_tick: 0.0,
+            next_item: 0.0,
+            held_item: None,
             player_id: None,
         }
     }
@@ -84,10 +88,21 @@ impl Game {
         });
         if let Some((pos, _)) = player_pos {
             let new_pos = self.map.add_dir(pos, dir);
-            if matches!(self.map[new_pos], MapCell::Empty) {
-                let cell = mem::take(&mut self.map[pos]);
-                self.map[new_pos] = cell;
+            match &self.map[new_pos] {
+                MapCell::Empty => {}
+                MapCell::Item(item) => {
+                    if matches!(item, Item::Food) {
+                        return;
+                    }
+                    if self.held_item.is_some() {
+                        return;
+                    }
+                    self.held_item = Some(item.clone());
+                }
+                _ => return,
             }
+            let cell = mem::take(&mut self.map[pos]);
+            self.map[new_pos] = cell;
         }
     }
 
@@ -105,6 +120,7 @@ impl Game {
                         _ => {}
                     }
                 }
+                self.ai_state = snake::AiState::new();
             }
         }
     }
@@ -124,9 +140,21 @@ impl geng::State for Game {
                 self.use_item(item);
             }
         }
+        self.next_item -= delta_time;
+        if self.next_item < 0.0 {
+            self.next_item = self.ctx.assets.config.new_item_time;
+            self.spawn_item();
+        }
     }
     fn handle_event(&mut self, event: geng::Event) {
         match event {
+            geng::Event::KeyPress { key }
+                if self.ctx.assets.config.controls.use_item.contains(&key) =>
+            {
+                if let Some(item) = self.held_item.take() {
+                    self.use_item(item);
+                }
+            }
             geng::Event::MousePress {
                 button: geng::MouseButton::Left,
             } if self.ctx.cli.editor => {
@@ -220,6 +248,10 @@ impl geng::State for Game {
             MapCell::SnakePart(idx) => idx,
             _ => unreachable!(),
         };
+        let item_color = |item: &Item| match item {
+            Item::Food => colors.food,
+            Item::Reverse => colors.reverse,
+        };
         for (pos, cell) in self.map.iter() {
             if self.map.distance(pos, snake_head) <= self.ctx.assets.config.snake_vision {
                 self.ctx.geng.draw2d().draw2d(
@@ -235,7 +267,7 @@ impl geng::State for Game {
             let color = match *cell {
                 MapCell::Empty => continue,
                 MapCell::Wall => colors.wall,
-                MapCell::Player(id) => colors.player,
+                MapCell::Player(_id) => colors.player,
                 MapCell::SnakePart(idx) => {
                     if idx == snake_head_idx {
                         colors.snake_head
@@ -245,10 +277,7 @@ impl geng::State for Game {
                         colors.snake[(snake_head_idx - idx) as usize % colors.snake.len()]
                     }
                 }
-                MapCell::Item(ref item) => match item {
-                    Item::Food => colors.food,
-                    Item::Reverse => colors.reverse,
-                },
+                MapCell::Item(ref item) => item_color(item),
             };
             let mut aabb = Aabb2::point(pos.map(|x| x as f32))
                 .extend_uniform(0.5 - self.ctx.assets.config.cell_margin);
@@ -275,6 +304,16 @@ impl geng::State for Game {
                 framebuffer,
                 &self.camera,
                 &draw2d::Quad::new(aabb, color),
+            );
+        }
+        if let Some(item) = &self.held_item {
+            self.ctx.geng.draw2d().draw2d(
+                framebuffer,
+                &geng::PixelPerfectCamera,
+                &draw2d::Quad::new(
+                    Aabb2::ZERO.extend_positive(vec2::splat(32.0)),
+                    item_color(item),
+                ),
             );
         }
         if self.ctx.cli.editor {

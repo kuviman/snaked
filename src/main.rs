@@ -31,6 +31,7 @@ pub struct Colors {
 
 #[derive(Deserialize)]
 pub struct Controls {
+    pub use_item: Vec<geng::Key>,
     pub left: Vec<geng::Key>,
     pub right: Vec<geng::Key>,
     pub up: Vec<geng::Key>,
@@ -41,6 +42,7 @@ pub struct Controls {
 #[load(serde = "toml")]
 pub struct Config {
     pub tps: f64,
+    pub new_item_time: f64,
     pub cell_margin: f32,
     pub camera_margin: f32,
     pub snake_vision: usize,

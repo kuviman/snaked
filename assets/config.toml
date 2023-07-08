@@ -1,4 +1,5 @@
 tps = 5
+new_item_time = 2
 cell_margin = 0.1
 camera_margin = 2
 snake_vision = 5
@@ -20,6 +21,7 @@ snake_vision = "#f003"
 reverse = "blue"
 
 [controls]
+use_item = ["Space", "Enter"]
 left = ["A", "ArrowLeft"]
 right = ["D", "ArrowRight"]
 up = ["W", "ArrowUp"]
