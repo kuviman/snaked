@@ -6,6 +6,7 @@ pub enum MapCell {
     Empty,
     Wall,
     Player(Id),
+    /// Head = max .0, tail = min .0
     SnakePart(u32),
 }
 

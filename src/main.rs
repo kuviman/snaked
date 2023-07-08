@@ -3,6 +3,7 @@ use geng::prelude::*;
 mod game;
 mod id;
 mod map;
+mod snake;
 
 use game::*;
 use id::*;

@@ -62,6 +62,13 @@ impl geng::State for Game {
                     self.map[pos] = MapCell::Wall;
                 }
             }
+            geng::Event::MousePress {
+                button: geng::MouseButton::Middle,
+            } if self.ctx.cli.editor => {
+                if let Some(pos) = self.hovered_cell() {
+                    snake::go_to(&mut self.map, pos);
+                }
+            }
             geng::Event::CursorMove { .. } if self.ctx.cli.editor => {
                 if let Some(pos) = self.hovered_cell() {
                     if self
