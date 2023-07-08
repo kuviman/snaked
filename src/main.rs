@@ -41,7 +41,8 @@ pub struct Controls {
 #[derive(geng::asset::Load, Deserialize)]
 #[load(serde = "toml")]
 pub struct Config {
-    pub tps: f64,
+    pub snake_speed: f64,
+    pub player_speed: f64,
     pub new_item_time: f64,
     pub cell_margin: f32,
     pub camera_margin: f32,

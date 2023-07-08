@@ -1,4 +1,5 @@
-tps = 5
+player_speed = 3
+snake_speed = 5
 new_item_time = 2
 cell_margin = 0.1
 camera_margin = 2

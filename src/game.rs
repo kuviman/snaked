@@ -8,7 +8,8 @@ pub struct Game {
     camera: Camera2d,
     player_id: Option<Id>,
     held_item: Option<Item>,
-    next_tick: f64,
+    next_snake_move: f64,
+    next_player_move: f64,
     next_item: f64,
 }
 
@@ -25,7 +26,8 @@ impl Game {
             },
             map,
             ai_state: snake::AiState::new(),
-            next_tick: 0.0,
+            next_snake_move: 0.0,
+            next_player_move: 0.0,
             next_item: 0.0,
             held_item: None,
             player_id: None,
@@ -79,6 +81,10 @@ impl Game {
     }
 
     fn move_player(&mut self, dir: vec2<isize>) {
+        if self.next_player_move > 0.0 {
+            return;
+        }
+        self.next_player_move = 1.0 / self.ctx.assets.config.player_speed;
         let player_pos = self.map.iter().find(|(_, cell)| {
             if let MapCell::Player(id) = cell {
                 Some(*id) == self.player_id
@@ -131,9 +137,9 @@ impl geng::State for Game {
         if self.player_id.is_none() {
             self.player_id = Some(self.spawn_player());
         }
-        self.next_tick -= delta_time;
-        if self.next_tick < 0.0 {
-            self.next_tick = 1.0 / self.ctx.assets.config.tps;
+        self.next_snake_move -= delta_time;
+        if self.next_snake_move < 0.0 {
+            self.next_snake_move = 1.0 / self.ctx.assets.config.snake_speed;
             if let Some(item) =
                 snake::go_ai(&self.ctx.assets.config, &mut self.map, &mut self.ai_state)
             {
@@ -144,6 +150,57 @@ impl geng::State for Game {
         if self.next_item < 0.0 {
             self.next_item = self.ctx.assets.config.new_item_time;
             self.spawn_item();
+        }
+        self.next_player_move -= delta_time;
+        if self.next_player_move < 0.0 {
+            let mut dir = None;
+            if self
+                .ctx
+                .assets
+                .config
+                .controls
+                .left
+                .iter()
+                .any(|&key| self.ctx.geng.window().is_key_pressed(key))
+            {
+                dir = Some(vec2(-1, 0));
+            }
+            if self
+                .ctx
+                .assets
+                .config
+                .controls
+                .right
+                .iter()
+                .any(|&key| self.ctx.geng.window().is_key_pressed(key))
+            {
+                dir = Some(vec2(1, 0));
+            }
+            if self
+                .ctx
+                .assets
+                .config
+                .controls
+                .up
+                .iter()
+                .any(|&key| self.ctx.geng.window().is_key_pressed(key))
+            {
+                dir = Some(vec2(0, 1));
+            }
+            if self
+                .ctx
+                .assets
+                .config
+                .controls
+                .down
+                .iter()
+                .any(|&key| self.ctx.geng.window().is_key_pressed(key))
+            {
+                dir = Some(vec2(0, -1));
+            }
+            if let Some(dir) = dir {
+                self.move_player(dir);
+            }
         }
     }
     fn handle_event(&mut self, event: geng::Event) {
