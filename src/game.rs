@@ -4,6 +4,7 @@ pub struct Game {
     id_gen: IdGen,
     ctx: Context,
     map: Map,
+    ai_state: snake::AiState,
     camera: Camera2d,
     next_tick: f64,
 }
@@ -20,6 +21,7 @@ impl Game {
                 fov: map.size().y as f32 + ctx.assets.config.camera_margin * 2.0,
             },
             map,
+            ai_state: snake::AiState::new(),
             next_tick: 0.0,
         }
     }
@@ -59,7 +61,7 @@ impl geng::State for Game {
         self.next_tick -= delta_time;
         if self.next_tick < 0.0 {
             self.next_tick = 1.0 / self.ctx.assets.config.tps;
-            snake::go_ai(&mut self.map);
+            snake::go_ai(&mut self.map, &mut self.ai_state);
         }
     }
     fn handle_event(&mut self, event: geng::Event) {

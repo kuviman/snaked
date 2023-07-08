@@ -38,13 +38,31 @@ pub fn tail(map: &Map) -> vec2<usize> {
     head_pos
 }
 
-pub fn go_ai(map: &mut Map) -> bool {
-    let did_smth = if let Some(pos) = find_closest_food(map) {
-        go_to(map, pos)
-    } else {
+pub struct AiState {
+    target_pos: Option<vec2<usize>>,
+}
+
+impl AiState {
+    pub fn new() -> Self {
+        Self { target_pos: None }
+    }
+}
+
+pub fn go_ai(map: &mut Map, state: &mut AiState) -> bool {
+    if let Some(pos) = find_closest_food(map) {
+        state.target_pos = Some(pos);
+    } else if state.target_pos.is_none() {
+        state.target_pos = Some(vec2(
+            thread_rng().gen_range(0..map.size().x),
+            thread_rng().gen_range(0..map.size().y),
+        ));
+    }
+    let mut did_smth = go_to(map, state.target_pos.unwrap());
+    if !did_smth {
+        state.target_pos = None;
         let tail_pos = tail(map);
-        go_to(map, tail_pos)
-    };
+        did_smth = go_to(map, tail_pos);
+    }
     if !did_smth {
         if let Some(next) = neighbors(head(map), map)
             .filter(|&pos| matches!(map[pos], MapCell::Player(_) | MapCell::Empty))
@@ -82,14 +100,11 @@ fn find_closest_food(map: &Map) -> Option<vec2<usize>> {
 }
 
 pub fn go_to(map: &mut Map, to: vec2<usize>) -> bool {
-    let (head_pos, _) = map
-        .iter()
-        .filter_map(|(pos, cell)| match cell {
-            MapCell::SnakePart(idx) => Some((pos, idx)),
-            _ => None,
-        })
-        .max_by_key(|&(_, idx)| idx)
-        .unwrap();
+    let head_pos = head(map);
+    let tail_pos = tail(map);
+    if to != tail_pos && matches!(map[to], MapCell::Wall | MapCell::SnakePart(_)) {
+        return false;
+    }
     let mut d = vec![vec![None::<usize>; map.size().y]; map.size().x];
     let mut q = std::collections::VecDeque::new();
     d[to.x][to.y] = Some(0);
@@ -116,7 +131,6 @@ pub fn go_to(map: &mut Map, to: vec2<usize>) -> bool {
             _ => unreachable!(),
         };
         if !matches!(map[next], MapCell::Player(_)) {
-            let tail_pos = tail(map);
             map[tail_pos] = MapCell::Empty;
         }
         map[next] = MapCell::SnakePart(head_idx + 1);
