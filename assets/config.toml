@@ -1,9 +1,10 @@
-player_speed = 3
+player_speed = 4
 snake_speed = 5
 new_item_time = 2
 cell_margin = 0.1
 camera_margin = 2
 snake_vision = 5
+start_snake_size = 5
 
 [items.snake_speed]
 time = 5

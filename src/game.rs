@@ -5,8 +5,55 @@ struct SnakeSpeedModifier {
     multiplier: f64,
 }
 
+#[derive(Debug)]
+pub struct Results {
+    time: f64,
+    win: bool,
+}
+
+pub struct EndScreen {
+    ctx: Context,
+    transition: Option<geng::state::Transition>,
+    results: Results,
+}
+
+impl EndScreen {
+    pub fn new(ctx: &Context, results: Results) -> Self {
+        Self {
+            ctx: ctx.clone(),
+            results,
+            transition: None,
+        }
+    }
+}
+
+impl geng::State for EndScreen {
+    fn transition(&mut self) -> Option<geng::state::Transition> {
+        self.transition.take()
+    }
+    fn handle_event(&mut self, event: geng::Event) {
+        if let geng::Event::KeyPress { key: geng::Key::R } = event {
+            self.transition = Some(geng::state::Transition::Switch(Box::new(Game::new(
+                &self.ctx,
+            ))));
+        }
+    }
+    fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
+        ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
+        self.ctx.geng.default_font().draw(
+            framebuffer,
+            &geng::PixelPerfectCamera,
+            &format!("{:#?}", self.results),
+            vec2::splat(geng::TextAlign::CENTER),
+            mat3::translate(framebuffer.size().map(|x| x as f32) / 2.0) * mat3::scale_uniform(32.0),
+            Rgba::WHITE,
+        )
+    }
+}
+
 pub struct Game {
     id_gen: IdGen,
+    time: f64,
     ctx: Context,
     map: Map,
     ai_state: snake::AiState,
@@ -16,12 +63,21 @@ pub struct Game {
     next_snake_move: f64,
     next_player_move: f64,
     next_item: f64,
+    snake_grow: usize,
     snake_speed_modifier: Option<SnakeSpeedModifier>,
+    transition: Option<geng::state::Transition>,
 }
 
 impl Game {
     pub fn new(ctx: &Context) -> Self {
-        let map = Map::parse(&ctx.assets.map);
+        let mut map = Map::parse(&ctx.assets.map);
+        let (pos, _) = map
+            .iter()
+            .filter(|(_, cell)| matches!(cell, MapCell::Empty))
+            .choose(&mut thread_rng())
+            .unwrap();
+        map[pos] = MapCell::SnakePart(0);
+
         Self {
             id_gen: id::IdGen::new(),
             ctx: ctx.clone(),
@@ -38,6 +94,9 @@ impl Game {
             held_item: None,
             player_id: None,
             snake_speed_modifier: None,
+            transition: None,
+            snake_grow: ctx.assets.config.start_snake_size - 1,
+            time: 0.0,
         }
     }
 
@@ -154,12 +213,43 @@ impl Game {
             }
         }
     }
+
+    fn results(&self) -> Results {
+        Results {
+            time: self.time,
+            win: self.map.iter().any(|(_, cell)| {
+                if let MapCell::Player(id) = *cell {
+                    Some(id) == self.player_id
+                } else {
+                    false
+                }
+            }),
+        }
+    }
 }
 
 impl geng::State for Game {
+    fn transition(&mut self) -> Option<geng::state::Transition> {
+        self.transition.take()
+    }
     fn update(&mut self, delta_time: f64) {
-        if self.player_id.is_none() {
-            self.player_id = Some(self.spawn_player());
+        self.time += delta_time;
+        if !self.ctx.cli.editor {
+            if self.player_id.is_none() {
+                self.player_id = Some(self.spawn_player());
+            } else {
+                if !self.map.iter().any(|(_, cell)| {
+                    if let MapCell::Player(id) = *cell {
+                        Some(id) == self.player_id
+                    } else {
+                        false
+                    }
+                }) {
+                    self.transition = Some(geng::state::Transition::Switch(Box::new(
+                        EndScreen::new(&self.ctx, self.results()),
+                    )));
+                }
+            }
         }
         if let Some(modifier) = &mut self.snake_speed_modifier {
             modifier.time_left -= delta_time;
@@ -175,10 +265,25 @@ impl geng::State for Game {
                     .snake_speed_modifier
                     .as_ref()
                     .map_or(1.0, |modifier| modifier.multiplier);
-            if let Some(item) =
-                snake::go_ai(&self.ctx.assets.config, &mut self.map, &mut self.ai_state)
-            {
-                self.use_item(item);
+            let res = snake::go_ai(
+                &self.ctx.assets.config,
+                &mut self.map,
+                &mut self.ai_state,
+                self.snake_grow == 0,
+            );
+            if self.snake_grow > 0 {
+                self.snake_grow -= 1;
+            }
+            match res {
+                Ok(Some(item)) => {
+                    self.use_item(item);
+                }
+                Ok(None) => {}
+                Err(()) => {
+                    self.transition = Some(geng::state::Transition::Switch(Box::new(
+                        EndScreen::new(&self.ctx, self.results()),
+                    )));
+                }
             }
         }
         self.next_item -= delta_time;
@@ -252,13 +357,6 @@ impl geng::State for Game {
             } if self.ctx.cli.editor => {
                 if let Some(pos) = self.hovered_cell() {
                     self.map[pos] = MapCell::Wall;
-                }
-            }
-            geng::Event::MousePress {
-                button: geng::MouseButton::Middle,
-            } if self.ctx.cli.editor => {
-                if let Some(pos) = self.hovered_cell() {
-                    let _ = snake::go_to(&mut self.map, pos);
                 }
             }
             geng::Event::CursorMove { .. } if self.ctx.cli.editor => {

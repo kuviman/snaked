@@ -56,6 +56,7 @@ pub struct Controls {
 #[derive(geng::asset::Load, Deserialize)]
 #[load(serde = "toml")]
 pub struct Config {
+    pub start_snake_size: usize,
     pub items: ItemsConfig,
     pub snake_speed: f64,
     pub player_speed: f64,

@@ -34,7 +34,12 @@ impl AiState {
     }
 }
 
-pub fn go_ai(config: &Config, map: &mut Map, state: &mut AiState) -> Option<Item> {
+pub fn go_ai(
+    config: &Config,
+    map: &mut Map,
+    state: &mut AiState,
+    remove_tail: bool,
+) -> Result<Option<Item>, ()> {
     if let Some(pos) = find_closest_food(config, map) {
         state.target_pos = Some(pos);
     } else if state.target_pos.is_none() {
@@ -43,23 +48,23 @@ pub fn go_ai(config: &Config, map: &mut Map, state: &mut AiState) -> Option<Item
             thread_rng().gen_range(0..map.size().y),
         ));
     }
-    if let Ok(item) = go_to(map, state.target_pos.unwrap()) {
-        return item;
+    if let Ok(item) = go_to(map, state.target_pos.unwrap(), remove_tail) {
+        return Ok(item);
     }
 
     state.target_pos = None;
     let tail_pos = tail(map);
-    if let Ok(item) = go_to(map, tail_pos) {
-        return item;
+    if let Ok(item) = go_to(map, tail_pos, remove_tail) {
+        return Ok(item);
     }
     if let Some(next) = map
         .neighbors(head(map))
         .filter(|&pos| !matches!(map[pos], MapCell::Wall | MapCell::SnakePart(_)))
         .choose(&mut thread_rng())
     {
-        return go_to(map, next).unwrap();
+        return Ok(go_to(map, next, remove_tail).unwrap());
     } else {
-        return None;
+        return Err(());
     }
 }
 
@@ -87,7 +92,7 @@ fn find_closest_food(config: &Config, map: &Map) -> Option<vec2<usize>> {
     None
 }
 
-pub fn go_to(map: &mut Map, to: vec2<usize>) -> Result<Option<Item>, ()> {
+pub fn go_to(map: &mut Map, to: vec2<usize>, remove_tail: bool) -> Result<Option<Item>, ()> {
     let head_pos = head(map);
     let tail_pos = tail(map);
     if to != tail_pos && matches!(map[to], MapCell::Wall | MapCell::SnakePart(_)) {
@@ -124,7 +129,9 @@ pub fn go_to(map: &mut Map, to: vec2<usize>) -> Result<Option<Item>, ()> {
             MapCell::Player(_) => {}
             MapCell::Item(item) => eaten_item = Some(item),
             MapCell::Empty | MapCell::SnakePart(_) => {
-                map[tail_pos] = MapCell::Empty;
+                if remove_tail {
+                    map[tail_pos] = MapCell::Empty;
+                }
             }
             MapCell::Wall => unreachable!(),
         }
