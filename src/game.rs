@@ -1,5 +1,10 @@
 use super::*;
 
+struct SnakeSpeedModifier {
+    time_left: f64,
+    multiplier: f64,
+}
+
 pub struct Game {
     id_gen: IdGen,
     ctx: Context,
@@ -11,6 +16,7 @@ pub struct Game {
     next_snake_move: f64,
     next_player_move: f64,
     next_item: f64,
+    snake_speed_modifier: Option<SnakeSpeedModifier>,
 }
 
 impl Game {
@@ -31,6 +37,7 @@ impl Game {
             next_item: 0.0,
             held_item: None,
             player_id: None,
+            snake_speed_modifier: None,
         }
     }
 
@@ -55,11 +62,16 @@ impl Game {
             .unwrap();
         let weights = &self.ctx.assets.config.weights;
         self.map[pos] = MapCell::Item(
-            [(weights.food, Item::Food), (weights.reverse, Item::Reverse)]
-                .choose_weighted(&mut thread_rng(), |&(weight, _)| weight)
-                .unwrap()
-                .1
-                .clone(),
+            [
+                (weights.food, Item::Food),
+                (weights.reverse, Item::Reverse),
+                (weights.snake_speed_up, Item::SnakeSpeedUp),
+                (weights.snake_speed_down, Item::SnakeSpeedDown),
+            ]
+            .choose_weighted(&mut thread_rng(), |&(weight, _)| weight)
+            .unwrap()
+            .1
+            .clone(),
         );
     }
 
@@ -128,6 +140,18 @@ impl Game {
                 }
                 self.ai_state = snake::AiState::new();
             }
+            Item::SnakeSpeedUp => {
+                self.snake_speed_modifier = Some(SnakeSpeedModifier {
+                    time_left: self.ctx.assets.config.items.snake_speed.time,
+                    multiplier: self.ctx.assets.config.items.snake_speed.multiplier,
+                });
+            }
+            Item::SnakeSpeedDown => {
+                self.snake_speed_modifier = Some(SnakeSpeedModifier {
+                    time_left: self.ctx.assets.config.items.snake_speed.time,
+                    multiplier: 1.0 / self.ctx.assets.config.items.snake_speed.multiplier,
+                });
+            }
         }
     }
 }
@@ -137,9 +161,20 @@ impl geng::State for Game {
         if self.player_id.is_none() {
             self.player_id = Some(self.spawn_player());
         }
+        if let Some(modifier) = &mut self.snake_speed_modifier {
+            modifier.time_left -= delta_time;
+            if modifier.time_left < 0.0 {
+                self.snake_speed_modifier = None;
+            }
+        }
         self.next_snake_move -= delta_time;
         if self.next_snake_move < 0.0 {
-            self.next_snake_move = 1.0 / self.ctx.assets.config.snake_speed;
+            self.next_snake_move = 1.0
+                / self.ctx.assets.config.snake_speed
+                / self
+                    .snake_speed_modifier
+                    .as_ref()
+                    .map_or(1.0, |modifier| modifier.multiplier);
             if let Some(item) =
                 snake::go_ai(&self.ctx.assets.config, &mut self.map, &mut self.ai_state)
             {
@@ -308,6 +343,8 @@ impl geng::State for Game {
         let item_color = |item: &Item| match item {
             Item::Food => colors.food,
             Item::Reverse => colors.reverse,
+            Item::SnakeSpeedUp => colors.snake_speed_up,
+            Item::SnakeSpeedDown => colors.snake_speed_down,
         };
         for (pos, cell) in self.map.iter() {
             if self.map.distance(pos, snake_head) <= self.ctx.assets.config.snake_vision {

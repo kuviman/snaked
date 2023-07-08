@@ -6,6 +6,8 @@ const DIRECTIONS: [vec2<isize>; 4] = [vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2
 pub enum Item {
     Food,
     Reverse,
+    SnakeSpeedUp,
+    SnakeSpeedDown,
 }
 
 #[derive(Default, Clone)]

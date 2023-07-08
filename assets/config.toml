@@ -5,9 +5,15 @@ cell_margin = 0.1
 camera_margin = 2
 snake_vision = 5
 
+[items.snake_speed]
+time = 5
+multiplier = 2
+
 [weights]
-food = 75
-reverse = 25
+food = 70
+reverse = 10
+snake_speed_up = 10
+snake_speed_down = 10
 
 [colors]
 background = "black"
@@ -20,6 +26,8 @@ wall = "white"
 hovered = "#7777"
 snake_vision = "#f003"
 reverse = "blue"
+snake_speed_up = "#70f"
+snake_speed_down = "#307"
 
 [controls]
 use_item = ["Space", "Enter"]

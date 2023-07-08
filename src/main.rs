@@ -13,6 +13,8 @@ use map::*;
 pub struct Weights {
     pub food: f64,
     pub reverse: f64,
+    pub snake_speed_up: f64,
+    pub snake_speed_down: f64,
 }
 
 #[derive(Deserialize)]
@@ -27,6 +29,19 @@ pub struct Colors {
     pub hovered: Rgba<f32>,
     pub reverse: Rgba<f32>,
     pub snake_vision: Rgba<f32>,
+    pub snake_speed_up: Rgba<f32>,
+    pub snake_speed_down: Rgba<f32>,
+}
+
+#[derive(Deserialize)]
+pub struct SnakeSpeedItemConfig {
+    pub multiplier: f64,
+    pub time: f64,
+}
+
+#[derive(Deserialize)]
+pub struct ItemsConfig {
+    pub snake_speed: SnakeSpeedItemConfig,
 }
 
 #[derive(Deserialize)]
@@ -41,6 +56,7 @@ pub struct Controls {
 #[derive(geng::asset::Load, Deserialize)]
 #[load(serde = "toml")]
 pub struct Config {
+    pub items: ItemsConfig,
     pub snake_speed: f64,
     pub player_speed: f64,
     pub new_item_time: f64,
