@@ -8,6 +8,7 @@ pub enum Item {
     Reverse,
     SnakeSpeedUp,
     SnakeSpeedDown,
+    SnakeSplit,
 }
 
 #[derive(Default, Clone)]
@@ -18,7 +19,10 @@ pub enum MapCell {
     Player(Id),
     Item(Item),
     /// Head = max .0, tail = min .0
-    SnakePart(u32),
+    SnakePart {
+        snake_id: Id,
+        segment_index: u32,
+    },
 }
 
 pub struct Map {
@@ -81,11 +85,7 @@ impl Map {
                             ' ' => MapCell::Empty,
                             '#' => MapCell::Wall,
                             _ => {
-                                if let Some(x) = c.to_digit(10) {
-                                    MapCell::SnakePart(x)
-                                } else {
-                                    panic!("Unexpected character {c:?}");
-                                }
+                                panic!("Unexpected character {c:?}");
                             }
                         };
                         cells.resize_with(cells.len().max(x + 1), default);

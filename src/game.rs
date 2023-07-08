@@ -56,15 +56,15 @@ pub struct Game {
     time: f64,
     ctx: Context,
     map: Map,
-    ai_state: snake::AiState,
+    ai_state: HashMap<Id, snake::AiState>,
     camera: Camera2d,
     player_id: Option<Id>,
     held_item: Option<Item>,
-    next_snake_move: f64,
+    next_snake_move: HashMap<Id, f64>,
     next_player_move: f64,
     next_item: f64,
-    snake_grow: usize,
-    snake_speed_modifier: Option<SnakeSpeedModifier>,
+    snake_grow: HashMap<Id, usize>,
+    snake_speed_modifier: HashMap<Id, SnakeSpeedModifier>,
     transition: Option<geng::state::Transition>,
 }
 
@@ -76,10 +76,15 @@ impl Game {
             .filter(|(_, cell)| matches!(cell, MapCell::Empty))
             .choose(&mut thread_rng())
             .unwrap();
-        map[pos] = MapCell::SnakePart(0);
+        let mut id_gen = IdGen::new();
+        let snake_id = id_gen.gen();
+        map[pos] = MapCell::SnakePart {
+            snake_id,
+            segment_index: 0,
+        };
 
         Self {
-            id_gen: id::IdGen::new(),
+            id_gen,
             ctx: ctx.clone(),
             camera: Camera2d {
                 center: map.size().map(|x| x as f32) / 2.0,
@@ -87,15 +92,19 @@ impl Game {
                 fov: map.size().y as f32 + ctx.assets.config.camera_margin * 2.0,
             },
             map,
-            ai_state: snake::AiState::new(),
-            next_snake_move: 0.0,
+            ai_state: HashMap::new(),
+            next_snake_move: default(),
             next_player_move: 0.0,
             next_item: 0.0,
             held_item: None,
             player_id: None,
-            snake_speed_modifier: None,
+            snake_speed_modifier: default(),
             transition: None,
-            snake_grow: ctx.assets.config.start_snake_size - 1,
+            snake_grow: {
+                let mut res = HashMap::new();
+                res.insert(snake_id, ctx.assets.config.start_snake_size - 1);
+                res
+            },
             time: 0.0,
         }
     }
@@ -126,6 +135,7 @@ impl Game {
                 (weights.reverse, Item::Reverse),
                 (weights.snake_speed_up, Item::SnakeSpeedUp),
                 (weights.snake_speed_down, Item::SnakeSpeedDown),
+                (weights.snake_split, Item::SnakeSplit),
             ]
             .choose_weighted(&mut thread_rng(), |&(weight, _)| weight)
             .unwrap()
@@ -183,33 +193,101 @@ impl Game {
         }
     }
 
-    fn use_item(&mut self, item: Item) {
+    fn snake_ids(&self) -> HashSet<Id> {
+        self.map
+            .iter()
+            .filter_map(|(_, cell)| {
+                if let MapCell::SnakePart { snake_id, .. } = cell {
+                    Some(*snake_id)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn use_item(&mut self, snake_id: Option<Id>, item: Item) {
+        let snake_id = snake_id.or(self.snake_ids().into_iter().choose(&mut thread_rng()));
+        let Some(id) = snake_id else { return };
         match item {
-            Item::Food => {}
+            Item::Food => {
+                *self.snake_grow.entry(id).or_default() += self.ctx.assets.config.food_value - 1;
+            }
             Item::Reverse => {
-                let head_idx = match self.map[snake::head(&self.map)] {
-                    MapCell::SnakePart(idx) => idx,
+                let head_idx = match self.map[snake::head(id, &self.map)] {
+                    MapCell::SnakePart {
+                        snake_id,
+                        segment_index,
+                    } if snake_id == id => segment_index,
                     _ => unreachable!(),
                 };
                 for (_pos, cell) in self.map.iter_mut() {
                     match *cell {
-                        MapCell::SnakePart(idx) => *cell = MapCell::SnakePart(head_idx - idx),
+                        MapCell::SnakePart {
+                            snake_id,
+                            segment_index,
+                        } if snake_id == id => {
+                            *cell = MapCell::SnakePart {
+                                snake_id,
+                                segment_index: head_idx - segment_index,
+                            }
+                        }
                         _ => {}
                     }
                 }
-                self.ai_state = snake::AiState::new();
+                self.ai_state.remove(&id);
             }
             Item::SnakeSpeedUp => {
-                self.snake_speed_modifier = Some(SnakeSpeedModifier {
-                    time_left: self.ctx.assets.config.items.snake_speed.time,
-                    multiplier: self.ctx.assets.config.items.snake_speed.multiplier,
-                });
+                self.snake_speed_modifier.insert(
+                    id,
+                    SnakeSpeedModifier {
+                        time_left: self.ctx.assets.config.items.snake_speed.time,
+                        multiplier: self.ctx.assets.config.items.snake_speed.multiplier,
+                    },
+                );
             }
             Item::SnakeSpeedDown => {
-                self.snake_speed_modifier = Some(SnakeSpeedModifier {
-                    time_left: self.ctx.assets.config.items.snake_speed.time,
-                    multiplier: 1.0 / self.ctx.assets.config.items.snake_speed.multiplier,
-                });
+                self.snake_speed_modifier.insert(
+                    id,
+                    SnakeSpeedModifier {
+                        time_left: self.ctx.assets.config.items.snake_speed.time,
+                        multiplier: 1.0 / self.ctx.assets.config.items.snake_speed.multiplier,
+                    },
+                );
+            }
+            Item::SnakeSplit => {
+                let mut min_max: HashMap<Id, (u32, u32)> = HashMap::new();
+                for (_pos, cell) in self.map.iter() {
+                    if let MapCell::SnakePart {
+                        snake_id,
+                        segment_index,
+                    } = *cell
+                    {
+                        let cur = min_max
+                            .entry(snake_id)
+                            .or_insert((segment_index, segment_index));
+                        cur.0 = cur.0.min(segment_index);
+                        cur.1 = cur.1.max(segment_index);
+                    }
+                }
+                let new_snake_ids: HashMap<Id, Id> = min_max
+                    .keys()
+                    .copied()
+                    .map(|id| (id, self.id_gen.gen()))
+                    .collect();
+                for (_pos, cell) in self.map.iter_mut() {
+                    if let MapCell::SnakePart {
+                        snake_id,
+                        segment_index,
+                    } = cell
+                    {
+                        if *snake_id == id
+                            && *segment_index > (min_max[snake_id].1 + min_max[snake_id].0) / 2
+                        {
+                            *snake_id = new_snake_ids[snake_id];
+                        }
+                    }
+                }
             }
         }
     }
@@ -251,41 +329,49 @@ impl geng::State for Game {
                 }
             }
         }
-        if let Some(modifier) = &mut self.snake_speed_modifier {
-            modifier.time_left -= delta_time;
-            if modifier.time_left < 0.0 {
-                self.snake_speed_modifier = None;
-            }
-        }
-        self.next_snake_move -= delta_time;
-        if self.next_snake_move < 0.0 {
-            self.next_snake_move = 1.0
-                / self.ctx.assets.config.snake_speed
-                / self
-                    .snake_speed_modifier
-                    .as_ref()
-                    .map_or(1.0, |modifier| modifier.multiplier);
-            let res = snake::go_ai(
-                &self.ctx.assets.config,
-                &mut self.map,
-                &mut self.ai_state,
-                self.snake_grow == 0,
-            );
-            if self.snake_grow > 0 {
-                self.snake_grow -= 1;
-            }
-            match res {
-                Ok(Some(item)) => {
-                    self.use_item(item);
-                }
-                Ok(None) => {}
-                Err(()) => {
-                    self.transition = Some(geng::state::Transition::Switch(Box::new(
-                        EndScreen::new(&self.ctx, self.results()),
-                    )));
+
+        for id in self.snake_ids() {
+            if let Some(modifier) = self.snake_speed_modifier.get_mut(&id) {
+                modifier.time_left -= delta_time;
+                if modifier.time_left < 0.0 {
+                    self.snake_speed_modifier.remove(&id);
                 }
             }
+            let next_move = self.next_snake_move.entry(id).or_default();
+            *next_move -= delta_time;
+            if *next_move < 0.0 {
+                *next_move = 1.0
+                    / self.ctx.assets.config.snake_speed
+                    / self
+                        .snake_speed_modifier
+                        .get(&id)
+                        .map_or(1.0, |modifier| modifier.multiplier);
+
+                let snake_grow = self.snake_grow.entry(id).or_default();
+                match snake::go_ai(
+                    id,
+                    &self.ctx.assets.config,
+                    &mut self.map,
+                    self.ai_state.entry(id).or_default(),
+                    *snake_grow == 0,
+                ) {
+                    Ok(Some(item)) => {
+                        self.use_item(Some(id), item);
+                    }
+                    Ok(None) => {}
+                    Err(()) => {
+                        self.transition = Some(geng::state::Transition::Switch(Box::new(
+                            EndScreen::new(&self.ctx, self.results()),
+                        )));
+                    }
+                }
+                let snake_grow = self.snake_grow.entry(id).or_default();
+                if *snake_grow > 0 {
+                    *snake_grow -= 1;
+                }
+            }
         }
+
         self.next_item -= delta_time;
         if self.next_item < 0.0 {
             self.next_item = self.ctx.assets.config.new_item_time;
@@ -349,7 +435,7 @@ impl geng::State for Game {
                 if self.ctx.assets.config.controls.use_item.contains(&key) =>
             {
                 if let Some(item) = self.held_item.take() {
-                    self.use_item(item);
+                    self.use_item(None, item);
                 }
             }
             geng::Event::MousePress {
@@ -428,24 +514,22 @@ impl geng::State for Game {
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         let colors = &self.ctx.assets.config.colors;
         ugli::clear(framebuffer, Some(colors.background), None, None);
-        let snake_head = snake::head(&self.map);
-        let snake_head_idx = match self.map[snake_head] {
-            MapCell::SnakePart(idx) => idx,
-            _ => unreachable!(),
-        };
-        let snake_tail = snake::tail(&self.map);
-        let snake_tail_idx = match self.map[snake_tail] {
-            MapCell::SnakePart(idx) => idx,
-            _ => unreachable!(),
-        };
         let item_color = |item: &Item| match item {
             Item::Food => colors.food,
             Item::Reverse => colors.reverse,
             Item::SnakeSpeedUp => colors.snake_speed_up,
             Item::SnakeSpeedDown => colors.snake_speed_down,
+            Item::SnakeSplit => colors.snake_split,
         };
+        let snake_ends: HashMap<Id, (vec2<usize>, vec2<usize>)> = self
+            .snake_ids()
+            .into_iter()
+            .map(|id| (id, (snake::head(id, &self.map), snake::tail(id, &self.map))))
+            .collect();
         for (pos, cell) in self.map.iter() {
-            if self.map.distance(pos, snake_head) <= self.ctx.assets.config.snake_vision {
+            if snake_ends.values().any(|&(head, _)| {
+                self.map.distance(pos, head) <= self.ctx.assets.config.snake_vision
+            }) {
                 self.ctx.geng.draw2d().draw2d(
                     framebuffer,
                     &self.camera,
@@ -460,13 +544,20 @@ impl geng::State for Game {
                 MapCell::Empty => continue,
                 MapCell::Wall => colors.wall,
                 MapCell::Player(_id) => colors.player,
-                MapCell::SnakePart(idx) => {
-                    if idx == snake_head_idx {
+                MapCell::SnakePart {
+                    snake_id,
+                    segment_index: idx,
+                } => {
+                    if pos == snake_ends[&snake_id].0 {
                         colors.snake_head
-                    } else if idx == snake_tail_idx {
+                    } else if pos == snake_ends[&snake_id].1 {
                         colors.snake_tail
                     } else {
-                        colors.snake[(snake_head_idx - idx) as usize % colors.snake.len()]
+                        colors.snake[(match self.map[snake_ends[&snake_id].0] {
+                            MapCell::SnakePart { segment_index, .. } => segment_index,
+                            _ => unreachable!(),
+                        } - idx) as usize
+                            % colors.snake.len()]
                     }
                 }
                 MapCell::Item(ref item) => item_color(item),
@@ -475,9 +566,16 @@ impl geng::State for Game {
                 .extend_uniform(0.5 - self.ctx.assets.config.cell_margin);
             let need_extend = |next: vec2<usize>| match (cell, &self.map[next]) {
                 (MapCell::Wall, MapCell::Wall) => true,
-                (&MapCell::SnakePart(prev), &MapCell::SnakePart(next)) => {
-                    prev + 1 == next || next + 1 == prev
-                }
+                (
+                    &MapCell::SnakePart {
+                        snake_id: prev_id,
+                        segment_index: prev,
+                    },
+                    &MapCell::SnakePart {
+                        snake_id: next_id,
+                        segment_index: next,
+                    },
+                ) if prev_id == next_id => prev + 1 == next || next + 1 == prev,
                 _ => false,
             };
             if need_extend(self.map.add_dir(pos, vec2(-1, 0))) {

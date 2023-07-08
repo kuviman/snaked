@@ -15,6 +15,7 @@ pub struct Weights {
     pub reverse: f64,
     pub snake_speed_up: f64,
     pub snake_speed_down: f64,
+    pub snake_split: f64,
 }
 
 #[derive(Deserialize)]
@@ -31,6 +32,7 @@ pub struct Colors {
     pub snake_vision: Rgba<f32>,
     pub snake_speed_up: Rgba<f32>,
     pub snake_speed_down: Rgba<f32>,
+    pub snake_split: Rgba<f32>,
 }
 
 #[derive(Deserialize)]
@@ -67,6 +69,7 @@ pub struct Config {
     pub colors: Colors,
     pub controls: Controls,
     pub weights: Weights,
+    pub food_value: usize,
 }
 
 #[derive(geng::asset::Load)]

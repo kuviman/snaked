@@ -1,10 +1,11 @@
-player_speed = 4
-snake_speed = 5
-new_item_time = 2
+player_speed = 10
+snake_speed = 10
+new_item_time = 1
 cell_margin = 0.1
 camera_margin = 2
 snake_vision = 5
 start_snake_size = 5
+food_value = 2
 
 [items.snake_speed]
 time = 5
@@ -13,8 +14,9 @@ multiplier = 2
 [weights]
 food = 70
 reverse = 10
-snake_speed_up = 10
+snake_speed_up = 5
 snake_speed_down = 10
+snake_split = 5
 
 [colors]
 background = "black"
@@ -29,6 +31,7 @@ snake_vision = "#f003"
 reverse = "blue"
 snake_speed_up = "#70f"
 snake_speed_down = "#307"
+snake_split = "yellow"
 
 [controls]
 use_item = ["Space", "Enter"]
