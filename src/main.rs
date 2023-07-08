@@ -10,6 +10,12 @@ use id::*;
 use map::*;
 
 #[derive(Deserialize)]
+pub struct Weights {
+    pub food: f64,
+    pub reverse: f64,
+}
+
+#[derive(Deserialize)]
 pub struct Colors {
     pub background: Rgba<f32>,
     pub wall: Rgba<f32>,
@@ -19,6 +25,7 @@ pub struct Colors {
     pub snake_tail: Rgba<f32>,
     pub snake: Vec<Rgba<f32>>,
     pub hovered: Rgba<f32>,
+    pub reverse: Rgba<f32>,
     pub snake_vision: Rgba<f32>,
 }
 
@@ -39,6 +46,7 @@ pub struct Config {
     pub snake_vision: usize,
     pub colors: Colors,
     pub controls: Controls,
+    pub weights: Weights,
 }
 
 #[derive(geng::asset::Load)]

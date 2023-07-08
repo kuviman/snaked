@@ -34,7 +34,7 @@ impl AiState {
     }
 }
 
-pub fn go_ai(config: &Config, map: &mut Map, state: &mut AiState) -> bool {
+pub fn go_ai(config: &Config, map: &mut Map, state: &mut AiState) -> Option<Item> {
     if let Some(pos) = find_closest_food(config, map) {
         state.target_pos = Some(pos);
     } else if state.target_pos.is_none() {
@@ -43,24 +43,24 @@ pub fn go_ai(config: &Config, map: &mut Map, state: &mut AiState) -> bool {
             thread_rng().gen_range(0..map.size().y),
         ));
     }
-    let mut did_smth = go_to(map, state.target_pos.unwrap());
-    if !did_smth {
-        state.target_pos = None;
-        let tail_pos = tail(map);
-        did_smth = go_to(map, tail_pos);
+    if let Ok(item) = go_to(map, state.target_pos.unwrap()) {
+        return item;
     }
-    if !did_smth {
-        if let Some(next) = map
-            .neighbors(head(map))
-            .filter(|&pos| matches!(map[pos], MapCell::Player(_) | MapCell::Empty))
-            .choose(&mut thread_rng())
-        {
-            assert!(go_to(map, next));
-        } else {
-            return false;
-        }
+
+    state.target_pos = None;
+    let tail_pos = tail(map);
+    if let Ok(item) = go_to(map, tail_pos) {
+        return item;
     }
-    true
+    if let Some(next) = map
+        .neighbors(head(map))
+        .filter(|&pos| !matches!(map[pos], MapCell::Wall | MapCell::SnakePart(_)))
+        .choose(&mut thread_rng())
+    {
+        return go_to(map, next).unwrap();
+    } else {
+        return None;
+    }
 }
 
 fn find_closest_food(config: &Config, map: &Map) -> Option<vec2<usize>> {
@@ -75,7 +75,7 @@ fn find_closest_food(config: &Config, map: &Map) -> Option<vec2<usize>> {
             continue;
         }
         for new_pos in map.neighbors(pos) {
-            if let MapCell::Player(_) = map[new_pos] {
+            if let MapCell::Player(_) | MapCell::Item(_) = map[new_pos] {
                 return Some(new_pos);
             }
             if d[new_pos.x][new_pos.y].is_none() {
@@ -87,11 +87,11 @@ fn find_closest_food(config: &Config, map: &Map) -> Option<vec2<usize>> {
     None
 }
 
-pub fn go_to(map: &mut Map, to: vec2<usize>) -> bool {
+pub fn go_to(map: &mut Map, to: vec2<usize>) -> Result<Option<Item>, ()> {
     let head_pos = head(map);
     let tail_pos = tail(map);
     if to != tail_pos && matches!(map[to], MapCell::Wall | MapCell::SnakePart(_)) {
-        return false;
+        return Err(());
     }
     let mut d = vec![vec![None::<usize>; map.size().y]; map.size().x];
     let mut q = std::collections::VecDeque::new();
@@ -119,12 +119,17 @@ pub fn go_to(map: &mut Map, to: vec2<usize>) -> bool {
             MapCell::SnakePart(idx) => idx,
             _ => unreachable!(),
         };
-        if !matches!(map[next], MapCell::Player(_)) {
-            map[tail_pos] = MapCell::Empty;
+        let mut eaten_item = None;
+        match mem::replace(&mut map[next], MapCell::SnakePart(head_idx + 1)) {
+            MapCell::Player(_) => {}
+            MapCell::Item(item) => eaten_item = Some(item),
+            MapCell::Empty | MapCell::SnakePart(_) => {
+                map[tail_pos] = MapCell::Empty;
+            }
+            MapCell::Wall => unreachable!(),
         }
-        map[next] = MapCell::SnakePart(head_idx + 1);
-        true
+        Ok(eaten_item)
     } else {
-        false
+        Err(())
     }
 }

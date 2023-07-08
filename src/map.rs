@@ -2,12 +2,19 @@ use super::*;
 
 const DIRECTIONS: [vec2<isize>; 4] = [vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2(0, 1)];
 
-#[derive(Default)]
+#[derive(Clone)]
+pub enum Item {
+    Food,
+    Reverse,
+}
+
+#[derive(Default, Clone)]
 pub enum MapCell {
     #[default]
     Empty,
     Wall,
     Player(Id),
+    Item(Item),
     /// Head = max .0, tail = min .0
     SnakePart(u32),
 }
@@ -47,6 +54,14 @@ impl Map {
     pub fn iter(&self) -> impl Iterator<Item = (vec2<usize>, &MapCell)> + '_ {
         self.cells.iter().enumerate().flat_map(|(x, row)| {
             row.iter()
+                .enumerate()
+                .map(move |(y, cell)| (vec2(x, y), cell))
+        })
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (vec2<usize>, &mut MapCell)> + '_ {
+        self.cells.iter_mut().enumerate().flat_map(|(x, row)| {
+            row.iter_mut()
                 .enumerate()
                 .map(move |(y, cell)| (vec2(x, y), cell))
         })
@@ -93,10 +108,8 @@ impl Map {
         for y in (0..self.size().y).rev() {
             for x in 0..self.size().x {
                 let c = match self.cells[x][y] {
-                    MapCell::Empty => ' ',
                     MapCell::Wall => '#',
-                    MapCell::Player(_) => ' ',
-                    MapCell::SnakePart(_) => ' ',
+                    _ => ' ',
                 };
                 write!(writer, "{c}").unwrap();
             }

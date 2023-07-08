@@ -40,6 +40,23 @@ impl Game {
         id
     }
 
+    pub fn spawn_item(&mut self) {
+        let (pos, _) = self
+            .map
+            .iter()
+            .filter(|(_, cell)| matches!(cell, MapCell::Empty))
+            .choose(&mut thread_rng())
+            .unwrap();
+        let weights = &self.ctx.assets.config.weights;
+        self.map[pos] = MapCell::Item(
+            [(weights.food, Item::Food), (weights.reverse, Item::Reverse)]
+                .choose_weighted(&mut thread_rng(), |&(weight, _)| weight)
+                .unwrap()
+                .1
+                .clone(),
+        );
+    }
+
     fn hovered_cell(&self) -> Option<vec2<usize>> {
         if let Some(hovered_pos) = self.ctx.geng.window().cursor_position() {
             let hovered_pos = self.camera.screen_to_world(
@@ -73,6 +90,24 @@ impl Game {
             }
         }
     }
+
+    fn use_item(&mut self, item: Item) {
+        match item {
+            Item::Food => {}
+            Item::Reverse => {
+                let head_idx = match self.map[snake::head(&self.map)] {
+                    MapCell::SnakePart(idx) => idx,
+                    _ => unreachable!(),
+                };
+                for (_pos, cell) in self.map.iter_mut() {
+                    match *cell {
+                        MapCell::SnakePart(idx) => *cell = MapCell::SnakePart(head_idx - idx),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl geng::State for Game {
@@ -83,7 +118,11 @@ impl geng::State for Game {
         self.next_tick -= delta_time;
         if self.next_tick < 0.0 {
             self.next_tick = 1.0 / self.ctx.assets.config.tps;
-            snake::go_ai(&self.ctx.assets.config, &mut self.map, &mut self.ai_state);
+            if let Some(item) =
+                snake::go_ai(&self.ctx.assets.config, &mut self.map, &mut self.ai_state)
+            {
+                self.use_item(item);
+            }
         }
     }
     fn handle_event(&mut self, event: geng::Event) {
@@ -99,7 +138,7 @@ impl geng::State for Game {
                 button: geng::MouseButton::Middle,
             } if self.ctx.cli.editor => {
                 if let Some(pos) = self.hovered_cell() {
-                    snake::go_to(&mut self.map, pos);
+                    let _ = snake::go_to(&mut self.map, pos);
                 }
             }
             geng::Event::CursorMove { .. } if self.ctx.cli.editor => {
@@ -129,6 +168,9 @@ impl geng::State for Game {
                     self.map[pos] = MapCell::Empty;
                 }
             }
+            geng::Event::KeyPress { key: geng::Key::R } if self.ctx.cli.editor => {
+                self.player_id = Some(self.spawn_player());
+            }
             geng::Event::KeyPress { key: geng::Key::S }
                 if self
                     .ctx
@@ -141,8 +183,8 @@ impl geng::State for Game {
             }
             geng::Event::KeyPress {
                 key: geng::Key::Space,
-            } => {
-                self.spawn_player();
+            } if self.ctx.cli.editor => {
+                self.spawn_item();
             }
             geng::Event::KeyPress { key }
                 if self.ctx.assets.config.controls.left.contains(&key) =>
@@ -193,7 +235,7 @@ impl geng::State for Game {
             let color = match *cell {
                 MapCell::Empty => continue,
                 MapCell::Wall => colors.wall,
-                MapCell::Player(_) => colors.player,
+                MapCell::Player(id) => colors.player,
                 MapCell::SnakePart(idx) => {
                     if idx == snake_head_idx {
                         colors.snake_head
@@ -203,6 +245,10 @@ impl geng::State for Game {
                         colors.snake[(snake_head_idx - idx) as usize % colors.snake.len()]
                     }
                 }
+                MapCell::Item(ref item) => match item {
+                    Item::Food => colors.food,
+                    Item::Reverse => colors.reverse,
+                },
             };
             let mut aabb = Aabb2::point(pos.map(|x| x as f32))
                 .extend_uniform(0.5 - self.ctx.assets.config.cell_margin);

@@ -3,6 +3,10 @@ cell_margin = 0.1
 camera_margin = 2
 snake_vision = 5
 
+[weights]
+food = 75
+reverse = 25
+
 [colors]
 background = "black"
 player = "red"
@@ -13,6 +17,7 @@ snake = ["#070", "#060", "#050", "#040", "#050", "#060"]
 wall = "white"
 hovered = "#7777"
 snake_vision = "#f003"
+reverse = "blue"
 
 [controls]
 left = ["A", "ArrowLeft"]
