@@ -10,6 +10,42 @@ fn neighbors(pos: vec2<usize>, map: &Map) -> impl Iterator<Item = vec2<usize>> +
     })
 }
 
+pub fn go_ai(map: &mut Map) {
+    if let Some(pos) = find_closest_food(map) {
+        go_to(map, pos);
+    }
+}
+
+fn find_closest_food(map: &Map) -> Option<vec2<usize>> {
+    let (head_pos, _) = map
+        .iter()
+        .filter_map(|(pos, cell)| match cell {
+            MapCell::SnakePart(idx) => Some((pos, idx)),
+            _ => None,
+        })
+        .max_by_key(|&(_, idx)| idx)
+        .unwrap();
+    let mut d = vec![vec![None::<usize>; map.size().y]; map.size().x];
+    let mut q = std::collections::VecDeque::new();
+    d[head_pos.x][head_pos.y] = Some(0);
+    q.push_back(head_pos);
+    while let Some(pos) = q.pop_front() {
+        let pos_d = d[pos.x][pos.y].unwrap();
+        for new_pos in neighbors(pos, map) {
+            match map[new_pos] {
+                MapCell::Wall | MapCell::SnakePart(_) => continue,
+                MapCell::Player(_) => return Some(new_pos),
+                _ => {}
+            }
+            if d[new_pos.x][new_pos.y].is_none() {
+                d[new_pos.x][new_pos.y] = Some(pos_d + 1);
+                q.push_back(new_pos);
+            }
+        }
+    }
+    None
+}
+
 pub fn go_to(map: &mut Map, to: vec2<usize>) {
     let (head_pos, _) = map
         .iter()

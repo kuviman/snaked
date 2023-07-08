@@ -21,6 +21,7 @@ pub struct Colors {
 #[derive(geng::asset::Load, Deserialize)]
 #[load(serde = "toml")]
 pub struct Config {
+    pub tps: f64,
     pub margin: f32,
     pub colors: Colors,
 }

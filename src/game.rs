@@ -5,6 +5,7 @@ pub struct Game {
     ctx: Context,
     map: Map,
     camera: Camera2d,
+    next_tick: f64,
 }
 
 impl Game {
@@ -19,6 +20,7 @@ impl Game {
                 fov: map.size().y as f32 + ctx.assets.config.margin * 2.0,
             },
             map,
+            next_tick: 0.0,
         }
     }
 
@@ -53,6 +55,13 @@ impl Game {
 }
 
 impl geng::State for Game {
+    fn update(&mut self, delta_time: f64) {
+        self.next_tick -= delta_time;
+        if self.next_tick < 0.0 {
+            self.next_tick = 1.0 / self.ctx.assets.config.tps;
+            snake::go_ai(&mut self.map);
+        }
+    }
     fn handle_event(&mut self, event: geng::Event) {
         match event {
             geng::Event::MousePress {
