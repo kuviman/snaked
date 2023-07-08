@@ -14,7 +14,9 @@ pub struct Colors {
     pub background: Rgba<f32>,
     pub wall: Rgba<f32>,
     pub player: Rgba<f32>,
-    pub snake: Rgba<f32>,
+    pub snake_head: Rgba<f32>,
+    pub snake_tail: Rgba<f32>,
+    pub snake: Vec<Rgba<f32>>,
     pub hovered: Rgba<f32>,
 }
 

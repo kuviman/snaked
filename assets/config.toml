@@ -4,6 +4,8 @@ margin = 2
 [colors]
 background = "black"
 player = "red"
-snake = "green"
+snake_head = "green"
+snake_tail = "#030"
+snake = ["#070", "#060", "#050", "#040", "#050", "#060"]
 wall = "white"
 hovered = "#7777"

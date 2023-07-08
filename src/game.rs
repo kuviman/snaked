@@ -126,12 +126,30 @@ impl geng::State for Game {
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         let colors = &self.ctx.assets.config.colors;
         ugli::clear(framebuffer, Some(colors.background), None, None);
+        let snake_head = snake::head(&self.map);
+        let snake_head_idx = match self.map[snake_head] {
+            MapCell::SnakePart(idx) => idx,
+            _ => unreachable!(),
+        };
+        let snake_tail = snake::tail(&self.map);
+        let snake_tail_idx = match self.map[snake_tail] {
+            MapCell::SnakePart(idx) => idx,
+            _ => unreachable!(),
+        };
         for (pos, cell) in self.map.iter() {
-            let color = match cell {
+            let color = match *cell {
                 MapCell::Empty => continue,
                 MapCell::Wall => colors.wall,
                 MapCell::Player(_) => colors.player,
-                MapCell::SnakePart(_) => colors.snake,
+                MapCell::SnakePart(idx) => {
+                    if idx == snake_head_idx {
+                        colors.snake_head
+                    } else if idx == snake_tail_idx {
+                        colors.snake_tail
+                    } else {
+                        colors.snake[(snake_head_idx - idx) as usize % colors.snake.len()]
+                    }
+                }
             };
             self.ctx.geng.draw2d().draw2d(
                 framebuffer,

@@ -10,13 +10,7 @@ fn neighbors(pos: vec2<usize>, map: &Map) -> impl Iterator<Item = vec2<usize>> +
     })
 }
 
-pub fn go_ai(map: &mut Map) {
-    if let Some(pos) = find_closest_food(map) {
-        go_to(map, pos);
-    }
-}
-
-fn find_closest_food(map: &Map) -> Option<vec2<usize>> {
+pub fn head(map: &Map) -> vec2<usize> {
     let (head_pos, _) = map
         .iter()
         .filter_map(|(pos, cell)| match cell {
@@ -25,6 +19,43 @@ fn find_closest_food(map: &Map) -> Option<vec2<usize>> {
         })
         .max_by_key(|&(_, idx)| idx)
         .unwrap();
+    head_pos
+}
+
+pub fn tail(map: &Map) -> vec2<usize> {
+    let (head_pos, _) = map
+        .iter()
+        .filter_map(|(pos, cell)| match cell {
+            MapCell::SnakePart(idx) => Some((pos, idx)),
+            _ => None,
+        })
+        .min_by_key(|&(_, idx)| idx)
+        .unwrap();
+    head_pos
+}
+
+pub fn go_ai(map: &mut Map) -> bool {
+    let did_smth = if let Some(pos) = find_closest_food(map) {
+        go_to(map, pos)
+    } else {
+        let tail_pos = tail(map);
+        go_to(map, tail_pos)
+    };
+    if !did_smth {
+        if let Some(next) = neighbors(head(map), map)
+            .filter(|&pos| matches!(map[pos], MapCell::Player(_) | MapCell::Empty))
+            .choose(&mut thread_rng())
+        {
+            assert!(go_to(map, next));
+        } else {
+            return false;
+        }
+    }
+    true
+}
+
+fn find_closest_food(map: &Map) -> Option<vec2<usize>> {
+    let head_pos = head(map);
     let mut d = vec![vec![None::<usize>; map.size().y]; map.size().x];
     let mut q = std::collections::VecDeque::new();
     d[head_pos.x][head_pos.y] = Some(0);
@@ -46,7 +77,7 @@ fn find_closest_food(map: &Map) -> Option<vec2<usize>> {
     None
 }
 
-pub fn go_to(map: &mut Map, to: vec2<usize>) {
+pub fn go_to(map: &mut Map, to: vec2<usize>) -> bool {
     let (head_pos, _) = map
         .iter()
         .filter_map(|(pos, cell)| match cell {
@@ -80,17 +111,13 @@ pub fn go_to(map: &mut Map, to: vec2<usize>) {
             MapCell::SnakePart(idx) => idx,
             _ => unreachable!(),
         };
+        if !matches!(map[next], MapCell::Player(_)) {
+            let tail_pos = tail(map);
+            map[tail_pos] = MapCell::Empty;
+        }
         map[next] = MapCell::SnakePart(head_idx + 1);
-        let (tail_pos, _) = map
-            .iter()
-            .filter_map(|(pos, cell)| match cell {
-                MapCell::SnakePart(idx) => Some((pos, idx)),
-                _ => None,
-            })
-            .min_by_key(|&(_, idx)| idx)
-            .unwrap();
-        map[tail_pos] = MapCell::Empty;
+        true
     } else {
-        log::warn!("No route");
+        false
     }
 }
