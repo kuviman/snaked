@@ -14,11 +14,20 @@ pub struct Colors {
     pub background: Rgba<f32>,
     pub wall: Rgba<f32>,
     pub player: Rgba<f32>,
+    pub food: Rgba<f32>,
     pub snake_head: Rgba<f32>,
     pub snake_tail: Rgba<f32>,
     pub snake: Vec<Rgba<f32>>,
     pub hovered: Rgba<f32>,
     pub snake_vision: Rgba<f32>,
+}
+
+#[derive(Deserialize)]
+pub struct Controls {
+    pub left: Vec<geng::Key>,
+    pub right: Vec<geng::Key>,
+    pub up: Vec<geng::Key>,
+    pub down: Vec<geng::Key>,
 }
 
 #[derive(geng::asset::Load, Deserialize)]
@@ -29,6 +38,7 @@ pub struct Config {
     pub camera_margin: f32,
     pub snake_vision: usize,
     pub colors: Colors,
+    pub controls: Controls,
 }
 
 #[derive(geng::asset::Load)]

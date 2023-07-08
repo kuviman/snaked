@@ -6,6 +6,7 @@ pub struct Game {
     map: Map,
     ai_state: snake::AiState,
     camera: Camera2d,
+    player_id: Option<Id>,
     next_tick: f64,
 }
 
@@ -23,6 +24,7 @@ impl Game {
             map,
             ai_state: snake::AiState::new(),
             next_tick: 0.0,
+            player_id: None,
         }
     }
 
@@ -54,10 +56,30 @@ impl Game {
         }
         None
     }
+
+    fn move_player(&mut self, dir: vec2<isize>) {
+        let player_pos = self.map.iter().find(|(_, cell)| {
+            if let MapCell::Player(id) = cell {
+                Some(*id) == self.player_id
+            } else {
+                false
+            }
+        });
+        if let Some((pos, _)) = player_pos {
+            let new_pos = self.map.add_dir(pos, dir);
+            if matches!(self.map[new_pos], MapCell::Empty) {
+                let cell = mem::take(&mut self.map[pos]);
+                self.map[new_pos] = cell;
+            }
+        }
+    }
 }
 
 impl geng::State for Game {
     fn update(&mut self, delta_time: f64) {
+        if self.player_id.is_none() {
+            self.player_id = Some(self.spawn_player());
+        }
         self.next_tick -= delta_time;
         if self.next_tick < 0.0 {
             self.next_tick = 1.0 / self.ctx.assets.config.tps;
@@ -121,6 +143,24 @@ impl geng::State for Game {
                 key: geng::Key::Space,
             } => {
                 self.spawn_player();
+            }
+            geng::Event::KeyPress { key }
+                if self.ctx.assets.config.controls.left.contains(&key) =>
+            {
+                self.move_player(vec2(-1, 0));
+            }
+            geng::Event::KeyPress { key }
+                if self.ctx.assets.config.controls.right.contains(&key) =>
+            {
+                self.move_player(vec2(1, 0));
+            }
+            geng::Event::KeyPress { key } if self.ctx.assets.config.controls.up.contains(&key) => {
+                self.move_player(vec2(0, 1));
+            }
+            geng::Event::KeyPress { key }
+                if self.ctx.assets.config.controls.down.contains(&key) =>
+            {
+                self.move_player(vec2(0, -1));
             }
             _ => {}
         }

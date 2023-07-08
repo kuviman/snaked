@@ -6,9 +6,16 @@ snake_vision = 5
 [colors]
 background = "black"
 player = "red"
+food = "#f7a"
 snake_head = "green"
 snake_tail = "#030"
 snake = ["#070", "#060", "#050", "#040", "#050", "#060"]
 wall = "white"
 hovered = "#7777"
 snake_vision = "#f003"
+
+[controls]
+left = ["A", "ArrowLeft"]
+right = ["D", "ArrowRight"]
+up = ["W", "ArrowUp"]
+down = ["S", "ArrowDown"]
