@@ -56,6 +56,23 @@ impl Map {
             },
         }
     }
+
+    pub fn save(&self, path: impl AsRef<std::path::Path>) {
+        let f = std::fs::File::create(path).unwrap();
+        let mut writer = std::io::BufWriter::new(f);
+        for y in (0..self.size().y).rev() {
+            for x in 0..self.size().x {
+                let c = match self.cells[x][y] {
+                    MapCell::Empty => ' ',
+                    MapCell::Wall => '#',
+                    MapCell::Player(_) => ' ',
+                    MapCell::SnakePart(_) => ' ',
+                };
+                write!(writer, "{c}").unwrap();
+            }
+            writeln!(writer).unwrap();
+        }
+    }
 }
 
 impl Index<vec2<usize>> for Map {

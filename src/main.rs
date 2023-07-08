@@ -14,6 +14,7 @@ pub struct Colors {
     pub wall: Rgba<f32>,
     pub player: Rgba<f32>,
     pub snake: Rgba<f32>,
+    pub hovered: Rgba<f32>,
 }
 
 #[derive(geng::asset::Load, Deserialize)]
@@ -33,9 +34,17 @@ pub struct Assets {
 pub struct Context {
     pub geng: Geng,
     pub assets: Rc<Assets>,
+    pub cli: Rc<CliArgs>,
+}
+
+#[derive(clap::Parser)]
+pub struct CliArgs {
+    #[clap(long)]
+    pub editor: bool,
 }
 
 fn main() {
+    let cli: CliArgs = cli::parse();
     Geng::run("Snaked", |geng| async move {
         let assets: Assets = geng
             .asset_manager()
@@ -45,6 +54,7 @@ fn main() {
         let ctx = Context {
             geng: geng.clone(),
             assets: Rc::new(assets),
+            cli: Rc::new(cli),
         };
         geng.run_state(Game::new(&ctx)).await;
     });

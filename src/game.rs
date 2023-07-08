@@ -33,15 +33,78 @@ impl Game {
         self.map[pos] = MapCell::Player(id);
         id
     }
+
+    fn hovered_cell(&self) -> Option<vec2<usize>> {
+        if let Some(hovered_pos) = self.ctx.geng.window().cursor_position() {
+            let hovered_pos = self.camera.screen_to_world(
+                self.ctx.geng.window().size().map(|x| x as f32),
+                hovered_pos.map(|x| x as f32),
+            );
+            let hovered_pos = hovered_pos.map(|x| (x + 0.5).floor() as i32);
+            if Aabb2::ZERO
+                .extend_positive(self.map.size().map(|x| x as i32))
+                .contains(hovered_pos)
+            {
+                return Some(hovered_pos.map(|x| x as usize));
+            }
+        }
+        None
+    }
 }
 
 impl geng::State for Game {
     fn handle_event(&mut self, event: geng::Event) {
-        if let geng::Event::KeyPress {
-            key: geng::Key::Space,
-        } = event
-        {
-            self.spawn_player();
+        match event {
+            geng::Event::MousePress {
+                button: geng::MouseButton::Left,
+            } if self.ctx.cli.editor => {
+                if let Some(pos) = self.hovered_cell() {
+                    self.map[pos] = MapCell::Wall;
+                }
+            }
+            geng::Event::CursorMove { .. } if self.ctx.cli.editor => {
+                if let Some(pos) = self.hovered_cell() {
+                    if self
+                        .ctx
+                        .geng
+                        .window()
+                        .is_button_pressed(geng::MouseButton::Left)
+                    {
+                        self.map[pos] = MapCell::Wall;
+                    }
+                    if self
+                        .ctx
+                        .geng
+                        .window()
+                        .is_button_pressed(geng::MouseButton::Right)
+                    {
+                        self.map[pos] = MapCell::Empty;
+                    }
+                }
+            }
+            geng::Event::MousePress {
+                button: geng::MouseButton::Right,
+            } if self.ctx.cli.editor => {
+                if let Some(pos) = self.hovered_cell() {
+                    self.map[pos] = MapCell::Empty;
+                }
+            }
+            geng::Event::KeyPress { key: geng::Key::S }
+                if self
+                    .ctx
+                    .geng
+                    .window()
+                    .is_key_pressed(geng::Key::ControlLeft)
+                    && self.ctx.cli.editor =>
+            {
+                self.map.save(run_dir().join("assets").join("map.txt"));
+            }
+            geng::Event::KeyPress {
+                key: geng::Key::Space,
+            } => {
+                self.spawn_player();
+            }
+            _ => {}
         }
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
@@ -62,6 +125,18 @@ impl geng::State for Game {
                     color,
                 ),
             );
+        }
+        if self.ctx.cli.editor {
+            if let Some(pos) = self.hovered_cell() {
+                self.ctx.geng.draw2d().draw2d(
+                    framebuffer,
+                    &self.camera,
+                    &draw2d::Quad::new(
+                        Aabb2::point(pos.map(|x| x as f32)).extend_uniform(0.5),
+                        colors.hovered,
+                    ),
+                );
+            }
         }
     }
 }
