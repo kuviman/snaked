@@ -875,59 +875,71 @@ impl geng::State for Game {
                 };
                 let mut ui_camera = ui_camera;
                 ui_camera.center.y -= 2.0;
-                self.ctx.assets.font.draw(
+                self.ctx.assets.font.draw_with_outline(
                     framebuffer,
                     &ui_camera,
                     text,
                     vec2::splat(geng::TextAlign::CENTER),
                     mat3::scale_uniform(1.0),
                     Rgba::WHITE,
+                    self.ctx.assets.config.outline_size,
+                    self.ctx.assets.config.outline_color,
                 );
-                self.ctx.assets.font.draw(
+                self.ctx.assets.font.draw_with_outline(
                     framebuffer,
                     &ui_camera,
                     &format!("score: {}", results.score),
                     vec2::splat(geng::TextAlign::CENTER),
                     mat3::translate(vec2(0.0, -1.5)),
                     Rgba::WHITE,
+                    self.ctx.assets.config.outline_size,
+                    self.ctx.assets.config.outline_color,
                 );
-                self.ctx.assets.font.draw(
+                self.ctx.assets.font.draw_with_outline(
                     framebuffer,
                     &ui_camera,
                     &"time survived:",
                     vec2::splat(geng::TextAlign::CENTER),
                     mat3::translate(vec2(0.0, -2.5)) * mat3::scale_uniform(0.5),
                     Rgba::WHITE,
+                    self.ctx.assets.config.outline_size,
+                    self.ctx.assets.config.outline_color,
                 );
                 let millis = (results.time * 1000.0).round() as i64;
                 let secs = millis / 1000;
                 let mins = secs / 60;
                 let secs = secs % 60;
                 let millis = millis % 1000;
-                self.ctx.assets.font.draw(
+                self.ctx.assets.font.draw_with_outline(
                     framebuffer,
                     &ui_camera,
                     &format!("{:02}:{:02}.{:03}", mins, secs, millis),
                     vec2::splat(geng::TextAlign::CENTER),
                     mat3::translate(vec2(0.0, -3.0)) * mat3::scale_uniform(0.5),
                     Rgba::WHITE,
+                    self.ctx.assets.config.outline_size,
+                    self.ctx.assets.config.outline_color,
                 );
 
-                self.ctx.assets.font.draw(
+                self.ctx.assets.font.draw_with_outline(
                     framebuffer,
                     &ui_camera,
                     "press R to restart",
                     vec2::splat(geng::TextAlign::CENTER),
                     mat3::translate(vec2(0.0, -4.0)) * mat3::scale_uniform(0.5),
                     Rgba::WHITE,
+                    self.ctx.assets.config.outline_size,
+                    self.ctx.assets.config.outline_color,
                 );
-                self.ctx.assets.font.draw(
+                self.ctx.assets.font.draw_with_outline(
                     framebuffer,
                     &ui_camera,
                     "press Tab to hide this screen",
                     vec2::splat(geng::TextAlign::CENTER),
                     mat3::translate(vec2(0.0, -5.0)) * mat3::scale_uniform(0.5),
                     Rgba::WHITE,
+                    self.ctx.assets.config.outline_size,
+                    self.ctx.assets.config.outline_color,
                 );
             }
         } else {
@@ -959,13 +971,15 @@ impl geng::State for Game {
                 Rgba::WHITE,
             );
             if !self.player_moved {
-                self.ctx.assets.font.draw(
+                self.ctx.assets.font.draw_with_outline(
                     framebuffer,
                     &ui_camera,
                     &"Use WASD/Arrows to move",
                     vec2::splat(geng::TextAlign::CENTER),
                     mat3::scale_uniform(0.5),
                     Rgba::WHITE,
+                    self.ctx.assets.config.outline_size,
+                    self.ctx.assets.config.outline_color,
                 );
             }
         }

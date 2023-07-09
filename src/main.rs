@@ -58,6 +58,8 @@ pub struct Controls {
 #[derive(geng::asset::Load, Deserialize)]
 #[load(serde = "toml")]
 pub struct Config {
+    pub outline_size: f32,
+    pub outline_color: Rgba<f32>,
     pub particle_opacity: f32,
     pub particle_lifetime: f64,
     pub particle_amount: usize,
