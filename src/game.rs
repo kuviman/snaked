@@ -40,6 +40,7 @@ pub struct Game {
     player_moved: bool,
     score: usize,
     particles: Vec<Particle>,
+    music: geng::SoundEffect,
 }
 
 impl Game {
@@ -59,6 +60,9 @@ impl Game {
     }
     pub fn new(ctx: &Context) -> Self {
         ctx.assets.sfx.start.play();
+
+        let mut music = ctx.assets.music.effect();
+        music.set_volume(ctx.assets.config.music_volume);
 
         let mut map = Map::parse(&ctx.assets.map);
         let (pos, _) = map
@@ -105,6 +109,7 @@ impl Game {
             time: 0.0,
             player_moved: false,
             score: 0,
+            music,
         }
     }
 
@@ -172,7 +177,10 @@ impl Game {
         if self.next_player_move > 0.0 {
             return;
         }
-        self.player_moved = true;
+        if !self.player_moved {
+            self.player_moved = true;
+            self.music.play();
+        }
         self.next_player_move = 1.0 / self.ctx.assets.config.player_speed;
         let player_pos = self.map.iter().find(|(_, cell)| {
             if let MapCell::Player(id) = cell {
@@ -330,6 +338,12 @@ impl Game {
     }
 }
 
+impl Drop for Game {
+    fn drop(&mut self) {
+        self.music.stop();
+    }
+}
+
 impl geng::State for Game {
     fn update(&mut self, delta_time: f64) {
         let delta_time = delta_time * self.ctx.assets.config.time_scale;
@@ -338,7 +352,9 @@ impl geng::State for Game {
             particle.pos += particle.vel * delta_time as f32;
         }
         self.particles.retain(|p| p.t < 1.0);
-        self.time += delta_time;
+        if self.player_moved {
+            self.time += delta_time;
+        }
         if !self.ctx.cli.editor && self.results.is_none() {
             if self.player_id.is_none() {
                 self.player_id = Some(self.spawn_player());
@@ -351,121 +367,124 @@ impl geng::State for Game {
                     }
                 }) {
                     self.results = Some(self.results());
+                    self.music.stop();
                     self.ctx.assets.sfx.end.play();
                 }
             }
         }
 
-        for id in self.snake_ids() {
-            if let Some(modifier) = self.snake_speed_modifier.get_mut(&id) {
-                modifier.time_left -= delta_time;
-                if modifier.time_left < 0.0 {
-                    self.snake_speed_modifier.remove(&id);
+        if self.player_moved {
+            for id in self.snake_ids() {
+                if let Some(modifier) = self.snake_speed_modifier.get_mut(&id) {
+                    modifier.time_left -= delta_time;
+                    if modifier.time_left < 0.0 {
+                        self.snake_speed_modifier.remove(&id);
+                    }
                 }
-            }
-            let next_move = self.next_snake_move.entry(id).or_default();
-            *next_move -= delta_time;
-            if *next_move < 0.0 {
-                if let Some(next_eat_index) = self.snake_reversing.remove(&id) {
-                    *next_move = 1.0 / self.ctx.assets.config.snake_reverse_speed;
-                    let head_pos = snake::head(id, &self.map);
-                    let head_index = match self.map[head_pos] {
-                        MapCell::SnakePart {
-                            snake_id,
-                            segment_index,
-                        } if snake_id == id => segment_index,
-                        _ => unreachable!(),
-                    };
-                    let next = self
-                        .map
-                        .neighbors(head_pos)
-                        .find(|&next| match self.map[next] {
+                let next_move = self.next_snake_move.entry(id).or_default();
+                *next_move -= delta_time;
+                if *next_move < 0.0 {
+                    if let Some(next_eat_index) = self.snake_reversing.remove(&id) {
+                        *next_move = 1.0 / self.ctx.assets.config.snake_reverse_speed;
+                        let head_pos = snake::head(id, &self.map);
+                        let head_index = match self.map[head_pos] {
                             MapCell::SnakePart {
                                 snake_id,
                                 segment_index,
-                            } => snake_id == id && segment_index == next_eat_index,
-                            _ => false,
-                        });
-                    if let Some(next) = next {
-                        self.map[next] = MapCell::SnakePart {
-                            snake_id: id,
-                            segment_index: head_index + 1,
+                            } if snake_id == id => segment_index,
+                            _ => unreachable!(),
                         };
-                        if next_eat_index > 0 {
-                            self.snake_reversing.insert(id, next_eat_index - 1);
+                        let next =
+                            self.map
+                                .neighbors(head_pos)
+                                .find(|&next| match self.map[next] {
+                                    MapCell::SnakePart {
+                                        snake_id,
+                                        segment_index,
+                                    } => snake_id == id && segment_index == next_eat_index,
+                                    _ => false,
+                                });
+                        if let Some(next) = next {
+                            self.map[next] = MapCell::SnakePart {
+                                snake_id: id,
+                                segment_index: head_index + 1,
+                            };
+                            if next_eat_index > 0 {
+                                self.snake_reversing.insert(id, next_eat_index - 1);
+                            }
                         }
-                    }
-                } else {
-                    *next_move = 1.0
-                        / self.ctx.assets.config.snake_speed
-                        / self
-                            .snake_speed_modifier
-                            .get(&id)
-                            .map_or(1.0, |modifier| modifier.multiplier);
+                    } else {
+                        *next_move = 1.0
+                            / self.ctx.assets.config.snake_speed
+                            / self
+                                .snake_speed_modifier
+                                .get(&id)
+                                .map_or(1.0, |modifier| modifier.multiplier);
 
-                    if let Some(modifier) = self.snake_speed_modifier.get(&id) {
-                        let texture = if modifier.multiplier > 1.0 {
-                            &self.ctx.assets.textures.speedup
-                        } else {
-                            &self.ctx.assets.textures.speeddown
-                        };
-                        self.spawn_particle(snake::head(id, &self.map), texture.clone());
-                    }
-                    let textures = &self.ctx.assets.textures;
-
-                    let snake_grow = self.snake_grow.entry(id).or_default();
-                    match snake::go_ai(
-                        id,
-                        &self.ctx.assets.config,
-                        &mut self.map,
-                        self.ai_state.entry(id).or_default(),
-                        *snake_grow == 0,
-                    ) {
-                        Ok(Some(item)) => {
-                            self.spawn_particle_batch(
-                                snake::head(id, &self.map),
-                                match item {
-                                    Item::Food => &textures.food,
-                                    Item::Reverse => &textures.reverse,
-                                    Item::SnakeSpeedUp => &textures.speedup,
-                                    Item::SnakeSpeedDown => &textures.speeddown,
-                                    Item::SnakeSplit => &textures.split,
-                                }
-                                .clone(),
-                            );
-                            self.use_item(Some(id), item);
-                            self.spawn_item();
+                        if let Some(modifier) = self.snake_speed_modifier.get(&id) {
+                            let texture = if modifier.multiplier > 1.0 {
+                                &self.ctx.assets.textures.speedup
+                            } else {
+                                &self.ctx.assets.textures.speeddown
+                            };
+                            self.spawn_particle(snake::head(id, &self.map), texture.clone());
                         }
-                        Ok(None) => {}
-                        Err(()) => {
-                            self.ctx.assets.sfx.ded.play();
-                            let mut explosion_positions = Vec::new();
-                            for (pos, cell) in self.map.iter_mut() {
-                                if let MapCell::SnakePart { snake_id, .. } = *cell {
-                                    if snake_id == id {
-                                        *cell = MapCell::Empty;
-                                        explosion_positions.push(pos);
+                        let textures = &self.ctx.assets.textures;
+
+                        let snake_grow = self.snake_grow.entry(id).or_default();
+                        match snake::go_ai(
+                            id,
+                            &self.ctx.assets.config,
+                            &mut self.map,
+                            self.ai_state.entry(id).or_default(),
+                            *snake_grow == 0,
+                        ) {
+                            Ok(Some(item)) => {
+                                self.spawn_particle_batch(
+                                    snake::head(id, &self.map),
+                                    match item {
+                                        Item::Food => &textures.food,
+                                        Item::Reverse => &textures.reverse,
+                                        Item::SnakeSpeedUp => &textures.speedup,
+                                        Item::SnakeSpeedDown => &textures.speeddown,
+                                        Item::SnakeSplit => &textures.split,
+                                    }
+                                    .clone(),
+                                );
+                                self.use_item(Some(id), item);
+                                self.spawn_item();
+                            }
+                            Ok(None) => {}
+                            Err(()) => {
+                                self.ctx.assets.sfx.ded.play();
+                                let mut explosion_positions = Vec::new();
+                                for (pos, cell) in self.map.iter_mut() {
+                                    if let MapCell::SnakePart { snake_id, .. } = *cell {
+                                        if snake_id == id {
+                                            *cell = MapCell::Empty;
+                                            explosion_positions.push(pos);
+                                        }
                                     }
                                 }
-                            }
-                            for pos in explosion_positions {
-                                let tex = self.ctx.assets.textures.snek.clone();
-                                self.spawn_particle(pos, tex);
+                                for pos in explosion_positions {
+                                    let tex = self.ctx.assets.textures.snek.clone();
+                                    self.spawn_particle(pos, tex);
+                                }
                             }
                         }
-                    }
-                    let snake_grow = self.snake_grow.entry(id).or_default();
-                    if *snake_grow > 0 {
-                        *snake_grow -= 1;
+                        let snake_grow = self.snake_grow.entry(id).or_default();
+                        if *snake_grow > 0 {
+                            *snake_grow -= 1;
+                        }
                     }
                 }
             }
-        }
 
-        self.next_item -= delta_time;
-        if self.next_item < 0.0 {
-            self.next_item = self.ctx.assets.config.new_item_time;
-            self.spawn_item();
+            self.next_item -= delta_time;
+            if self.next_item < 0.0 {
+                self.next_item = self.ctx.assets.config.new_item_time;
+                self.spawn_item();
+            }
         }
 
         self.next_player_move -= delta_time;

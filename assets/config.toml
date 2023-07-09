@@ -18,6 +18,7 @@ particle_max_speed = 3
 particle_amount = 3
 particle_lifetime = 0.5
 volume = 1
+music_volume = 0.5
 
 [items.snake_speed]
 time = 5

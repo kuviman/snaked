@@ -81,6 +81,7 @@ pub struct Config {
     pub snake_wake_up_time: f64,
     pub snake_reverse_speed: f64,
     pub volume: f64,
+    pub music_volume: f64,
 }
 
 #[derive(geng::asset::Load)]
@@ -119,6 +120,8 @@ pub struct Assets {
     pub config: Config,
     pub textures: Textures,
     pub sfx: Sfx,
+    #[load(path = "snake.mp3", options(looped = "true"))]
+    pub music: geng::Sound,
 }
 
 #[derive(Clone)]
