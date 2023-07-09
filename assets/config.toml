@@ -10,6 +10,8 @@ time_scale = 1
 max_items = 10
 snake_wake_up_time = 1
 snake_reverse_speed = 25
+text_scale = 1
+ui_fov = 10
 
 [items.snake_speed]
 time = 5

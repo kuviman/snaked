@@ -502,8 +502,8 @@ impl geng::State for Game {
                     self.map[pos] = MapCell::Empty;
                 }
             }
-            geng::Event::KeyPress { key: geng::Key::R } if self.ctx.cli.editor => {
-                self.player_id = Some(self.spawn_player());
+            geng::Event::KeyPress { key: geng::Key::R } => {
+                *self = Self::new(&self.ctx);
             }
             geng::Event::KeyPress { key: geng::Key::S }
                 if self
@@ -647,6 +647,57 @@ impl geng::State for Game {
                     ),
                 );
             }
+        }
+
+        if let Some(results) = &self.results {
+            let text = if results.win {
+                "You WON! WOW"
+            } else {
+                "You LOST! LUL"
+            };
+            let ui_camera = geng::Camera2d {
+                center: vec2::ZERO,
+                rotation: Angle::ZERO,
+                fov: self.ctx.assets.config.ui_fov,
+            };
+            self.ctx.assets.font.draw(
+                framebuffer,
+                &ui_camera,
+                text,
+                vec2::splat(geng::TextAlign::CENTER),
+                mat3::scale_uniform(1.0),
+                Rgba::WHITE,
+            );
+            self.ctx.assets.font.draw(
+                framebuffer,
+                &ui_camera,
+                &"time:",
+                vec2::splat(geng::TextAlign::CENTER),
+                mat3::translate(vec2(0.0, -1.5)) * mat3::scale_uniform(0.5),
+                Rgba::WHITE,
+            );
+            let millis = (results.time * 1000.0).round() as i64;
+            let secs = millis / 1000;
+            let mins = secs / 60;
+            let secs = secs % 60;
+            let millis = millis % 1000;
+            self.ctx.assets.font.draw(
+                framebuffer,
+                &ui_camera,
+                &format!("{:02}:{:02}.{:03}", mins, secs, millis),
+                vec2::splat(geng::TextAlign::CENTER),
+                mat3::translate(vec2(0.0, -2.0)) * mat3::scale_uniform(0.5),
+                Rgba::WHITE,
+            );
+
+            self.ctx.assets.font.draw(
+                framebuffer,
+                &ui_camera,
+                "Press R to restart",
+                vec2::splat(geng::TextAlign::CENTER),
+                mat3::translate(vec2(0.0, -3.0)) * mat3::scale_uniform(0.5),
+                Rgba::WHITE,
+            );
         }
     }
 }

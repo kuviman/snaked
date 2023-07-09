@@ -58,6 +58,7 @@ pub struct Controls {
 #[derive(geng::asset::Load, Deserialize)]
 #[load(serde = "toml")]
 pub struct Config {
+    pub ui_fov: f32,
     pub start_snake_size: usize,
     pub items: ItemsConfig,
     pub snake_speed: f64,
@@ -78,6 +79,8 @@ pub struct Config {
 
 #[derive(geng::asset::Load)]
 pub struct Assets {
+    #[load(path = "font/PixeloidSansBold-PKnYd.ttf")]
+    pub font: geng::Font,
     pub map: String,
     pub config: Config,
 }
