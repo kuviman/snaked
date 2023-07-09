@@ -54,7 +54,11 @@ impl Game {
             },
             map,
             ai_state: HashMap::new(),
-            next_snake_move: default(),
+            next_snake_move: {
+                let mut res = HashMap::new();
+                res.insert(snake_id, ctx.assets.config.snake_wake_up_time);
+                res
+            },
             next_player_move: 0.0,
             next_item: 0.0,
             held_item: None,
@@ -246,6 +250,10 @@ impl Game {
                     .copied()
                     .map(|id| (id, self.id_gen.gen()))
                     .collect();
+                self.next_snake_move.insert(
+                    new_snake_ids[&id],
+                    self.ctx.assets.config.snake_wake_up_time,
+                );
                 for (_pos, cell) in self.map.iter_mut() {
                     if let MapCell::SnakePart {
                         snake_id,
@@ -253,7 +261,7 @@ impl Game {
                     } = cell
                     {
                         if *snake_id == id
-                            && *segment_index > (min_max[snake_id].1 + min_max[snake_id].0) / 2
+                            && *segment_index < (min_max[snake_id].1 + min_max[snake_id].0) / 2
                         {
                             *snake_id = new_snake_ids[snake_id];
                         }
