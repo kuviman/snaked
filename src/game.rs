@@ -11,46 +11,6 @@ pub struct Results {
     win: bool,
 }
 
-pub struct EndScreen {
-    ctx: Context,
-    transition: Option<geng::state::Transition>,
-    results: Results,
-}
-
-impl EndScreen {
-    pub fn new(ctx: &Context, results: Results) -> Self {
-        Self {
-            ctx: ctx.clone(),
-            results,
-            transition: None,
-        }
-    }
-}
-
-impl geng::State for EndScreen {
-    fn transition(&mut self) -> Option<geng::state::Transition> {
-        self.transition.take()
-    }
-    fn handle_event(&mut self, event: geng::Event) {
-        if let geng::Event::KeyPress { key: geng::Key::R } = event {
-            self.transition = Some(geng::state::Transition::Switch(Box::new(Game::new(
-                &self.ctx,
-            ))));
-        }
-    }
-    fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
-        ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
-        self.ctx.geng.default_font().draw(
-            framebuffer,
-            &geng::PixelPerfectCamera,
-            &format!("{:#?}", self.results),
-            vec2::splat(geng::TextAlign::CENTER),
-            mat3::translate(framebuffer.size().map(|x| x as f32) / 2.0) * mat3::scale_uniform(32.0),
-            Rgba::WHITE,
-        )
-    }
-}
-
 pub struct Game {
     id_gen: IdGen,
     time: f64,
@@ -65,7 +25,7 @@ pub struct Game {
     next_item: f64,
     snake_grow: HashMap<Id, usize>,
     snake_speed_modifier: HashMap<Id, SnakeSpeedModifier>,
-    transition: Option<geng::state::Transition>,
+    results: Option<Results>,
 }
 
 impl Game {
@@ -99,7 +59,7 @@ impl Game {
             held_item: None,
             player_id: None,
             snake_speed_modifier: default(),
-            transition: None,
+            results: None,
             snake_grow: {
                 let mut res = HashMap::new();
                 res.insert(snake_id, ctx.assets.config.start_snake_size - 1);
@@ -308,12 +268,9 @@ impl Game {
 }
 
 impl geng::State for Game {
-    fn transition(&mut self) -> Option<geng::state::Transition> {
-        self.transition.take()
-    }
     fn update(&mut self, delta_time: f64) {
         self.time += delta_time;
-        if !self.ctx.cli.editor {
+        if !self.ctx.cli.editor && self.results.is_none() {
             if self.player_id.is_none() {
                 self.player_id = Some(self.spawn_player());
             } else {
@@ -324,9 +281,7 @@ impl geng::State for Game {
                         false
                     }
                 }) {
-                    self.transition = Some(geng::state::Transition::Switch(Box::new(
-                        EndScreen::new(&self.ctx, self.results()),
-                    )));
+                    self.results = Some(self.results());
                 }
             }
         }
@@ -361,9 +316,13 @@ impl geng::State for Game {
                     }
                     Ok(None) => {}
                     Err(()) => {
-                        self.transition = Some(geng::state::Transition::Switch(Box::new(
-                            EndScreen::new(&self.ctx, self.results()),
-                        )));
+                        for (_, cell) in self.map.iter_mut() {
+                            if let MapCell::SnakePart { snake_id, .. } = *cell {
+                                if snake_id == id {
+                                    *cell = MapCell::Empty;
+                                }
+                            }
+                        }
                     }
                 }
                 let snake_grow = self.snake_grow.entry(id).or_default();
