@@ -417,7 +417,19 @@ impl geng::State for Game {
                 if self.ctx.assets.config.controls.use_item.contains(&key) =>
             {
                 if let Some(item) = self.held_item.take() {
-                    self.use_item(None, item);
+                    let player_pos = self.map.iter().find(|(_, cell)| {
+                        if let MapCell::Player(id) = cell {
+                            self.player_id == Some(*id)
+                        } else {
+                            false
+                        }
+                    });
+                    if let Some((player_pos, _)) = player_pos {
+                        let snake_id = self.snake_ids().into_iter().min_by_key(|&id| {
+                            self.map.distance(snake::head(id, &self.map), player_pos)
+                        });
+                        self.use_item(snake_id, item);
+                    }
                 }
             }
             geng::Event::MousePress {
