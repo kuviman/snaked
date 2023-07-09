@@ -31,7 +31,7 @@ food = 200
 reverse = 10
 snake_speed_up = 5
 snake_speed_down = 10
-snake_split = 5
+snake_split = 10
 
 [colors]
 background = "#010"
