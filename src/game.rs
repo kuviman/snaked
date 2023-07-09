@@ -207,6 +207,7 @@ impl Game {
     }
 
     fn use_item(&mut self, snake_id: Option<Id>, item: Item) {
+        // TODO: instead of rng closest to player maybe"????
         let snake_id = snake_id.or(self.snake_ids().into_iter().choose(&mut thread_rng()));
         let Some(id) = snake_id else { return };
         match item {

@@ -117,8 +117,10 @@ pub fn go_to(
         return Err(());
     }
     let mut d = vec![vec![None::<usize>; map.size().y]; map.size().x];
+    let mut nums = vec![vec![0.0; map.size().y]; map.size().x];
     let mut q = std::collections::VecDeque::new();
     d[to.x][to.y] = Some(0);
+    nums[to.x][to.y] = 1.0;
     q.push_back(to);
     while let Some(pos) = q.pop_front() {
         let pos_d = d[pos.x][pos.y].unwrap();
@@ -126,41 +128,58 @@ pub fn go_to(
             if let MapCell::Wall | MapCell::SnakePart { .. } = map[new_pos] {
                 continue;
             }
-            if d[new_pos.x][new_pos.y].is_none() {
-                d[new_pos.x][new_pos.y] = Some(pos_d + 1);
-                q.push_back(new_pos);
+            match d[new_pos.x][new_pos.y] {
+                Some(d) => {
+                    if d == pos_d + 1 {
+                        nums[new_pos.x][new_pos.y] += nums[pos.x][pos.y];
+                    }
+                }
+                None => {
+                    d[new_pos.x][new_pos.y] = Some(pos_d + 1);
+                    nums[new_pos.x][new_pos.y] = nums[pos.x][pos.y];
+                    q.push_back(new_pos);
+                }
             }
         }
     }
 
-    if let Some(next) = map
+    let dist = map
         .neighbors(head_pos)
         .filter(|next| d[next.x][next.y].is_some())
-        .min_by_key(|next| d[next.x][next.y].unwrap())
-    {
-        let head_idx = match map[head_pos] {
-            MapCell::SnakePart { segment_index, .. } => segment_index,
-            _ => unreachable!(),
-        };
-        let mut eaten_item = None;
-        match mem::replace(
-            &mut map[next],
-            MapCell::SnakePart {
-                snake_id: id,
-                segment_index: head_idx + 1,
-            },
-        ) {
-            MapCell::Player(_) => {}
-            MapCell::Item(item) => eaten_item = Some(item),
-            MapCell::Empty | MapCell::SnakePart { .. } => {
-                if remove_tail {
-                    map[tail_pos] = MapCell::Empty;
-                }
+        .map(|next| d[next.x][next.y].unwrap())
+        .min();
+    let Some(dist) = dist else {
+        return Err(());
+    };
+    let choices: Vec<_> = map
+        .neighbors(head_pos)
+        .filter(|next| d[next.x][next.y] == Some(dist))
+        .collect();
+
+    let next = *choices
+        .choose_weighted(&mut thread_rng(), |next| nums[next.x][next.y])
+        .unwrap();
+
+    let head_idx = match map[head_pos] {
+        MapCell::SnakePart { segment_index, .. } => segment_index,
+        _ => unreachable!(),
+    };
+    let mut eaten_item = None;
+    match mem::replace(
+        &mut map[next],
+        MapCell::SnakePart {
+            snake_id: id,
+            segment_index: head_idx + 1,
+        },
+    ) {
+        MapCell::Player(_) => {}
+        MapCell::Item(item) => eaten_item = Some(item),
+        MapCell::Empty | MapCell::SnakePart { .. } => {
+            if remove_tail {
+                map[tail_pos] = MapCell::Empty;
             }
-            MapCell::Wall => unreachable!(),
         }
-        Ok(eaten_item)
-    } else {
-        Err(())
+        MapCell::Wall => unreachable!(),
     }
+    Ok(eaten_item)
 }
