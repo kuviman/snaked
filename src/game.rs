@@ -82,6 +82,14 @@ impl Game {
     }
 
     pub fn spawn_item(&mut self) {
+        let num_items = self
+            .map
+            .iter()
+            .filter(|(_, cell)| matches!(cell, MapCell::Item(_)))
+            .count();
+        if num_items >= self.ctx.assets.config.max_items {
+            return;
+        }
         let (pos, _) = self
             .map
             .iter()
@@ -269,6 +277,7 @@ impl Game {
 
 impl geng::State for Game {
     fn update(&mut self, delta_time: f64) {
+        let delta_time = delta_time * self.ctx.assets.config.time_scale;
         self.time += delta_time;
         if !self.ctx.cli.editor && self.results.is_none() {
             if self.player_id.is_none() {
@@ -313,6 +322,7 @@ impl geng::State for Game {
                 ) {
                     Ok(Some(item)) => {
                         self.use_item(Some(id), item);
+                        self.spawn_item();
                     }
                     Ok(None) => {}
                     Err(()) => {

@@ -70,6 +70,8 @@ pub struct Config {
     pub controls: Controls,
     pub weights: Weights,
     pub food_value: usize,
+    pub time_scale: f64,
+    pub max_items: usize,
 }
 
 #[derive(geng::asset::Load)]
