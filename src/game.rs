@@ -42,6 +42,9 @@ pub struct Game {
     particles: Vec<Particle>,
     music: Option<geng::SoundEffect>,
     show_ui: bool,
+    screen_shake: f64,
+    next_screen_shake: f64,
+    camera_center: vec2<f32>,
 }
 
 impl Game {
@@ -94,12 +97,17 @@ impl Game {
             segment_index: 0,
         };
 
+        let camera_center = map.size().map(|x| x as f32) / 2.0;
+
         Self {
+            screen_shake: 0.5,
+            next_screen_shake: 0.0,
             particles: default(),
             id_gen,
             ctx: ctx.clone(),
+            camera_center,
             camera: Camera2d {
-                center: map.size().map(|x| x as f32) / 2.0,
+                center: camera_center,
                 rotation: Angle::ZERO,
                 fov: map.size().y as f32 + ctx.assets.config.camera_margin * 2.0,
             },
@@ -364,6 +372,15 @@ impl Drop for Game {
 
 impl geng::State for Game {
     fn update(&mut self, delta_time: f64) {
+        self.screen_shake -= delta_time;
+        if self.screen_shake > 0.0 {
+            self.next_screen_shake -= delta_time;
+            if self.next_screen_shake < 0.0 {
+                self.next_screen_shake += 1.0 / 30.0;
+                self.camera.center = thread_rng()
+                    .gen_circle(self.camera_center, 1.0 * self.screen_shake.min(1.0) as f32);
+            }
+        }
         let delta_time = delta_time * self.ctx.assets.config.time_scale;
         for particle in &mut self.particles {
             particle.t += (delta_time / self.ctx.assets.config.particle_lifetime) as f32;
@@ -385,6 +402,7 @@ impl geng::State for Game {
                     }
                 }) {
                     self.results = Some(self.results());
+                    self.screen_shake = 0.5;
                     self.show_ui = true;
                     self.stop_music();
                     self.ctx.assets.sfx.end.play();
@@ -476,6 +494,7 @@ impl geng::State for Game {
                             Ok(None) => {}
                             Err(()) => {
                                 self.ctx.assets.sfx.ded.play();
+                                self.screen_shake = 1.0;
                                 let mut explosion_positions = Vec::new();
                                 for (pos, cell) in self.map.iter_mut() {
                                     if let MapCell::SnakePart { snake_id, .. } = *cell {
