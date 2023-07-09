@@ -9,6 +9,7 @@ struct SnakeSpeedModifier {
 pub struct Results {
     time: f64,
     win: bool,
+    score: usize,
 }
 
 pub struct Game {
@@ -29,6 +30,7 @@ pub struct Game {
     results: Option<Results>,
     alternate_move: usize,
     player_moved: bool,
+    score: usize,
 }
 
 impl Game {
@@ -78,6 +80,7 @@ impl Game {
             alternate_move: 0,
             time: 0.0,
             player_moved: false,
+            score: 0,
         }
     }
 
@@ -192,6 +195,7 @@ impl Game {
         // TODO: instead of rng closest to player maybe"????
         let snake_id = snake_id.or(self.snake_ids().into_iter().choose(&mut thread_rng()));
         let Some(id) = snake_id else { return };
+        self.score += 1;
         match item {
             Item::Food => {
                 *self.snake_grow.entry(id).or_default() += self.ctx.assets.config.food_value - 1;
@@ -297,6 +301,7 @@ impl Game {
                     false
                 }
             }),
+            score: self.score,
         }
     }
 }
@@ -705,6 +710,8 @@ impl geng::State for Game {
             } else {
                 "You LOST! LUL"
             };
+            let mut ui_camera = ui_camera;
+            ui_camera.center.y -= 2.0;
             self.ctx.assets.font.draw(
                 framebuffer,
                 &ui_camera,
@@ -716,9 +723,17 @@ impl geng::State for Game {
             self.ctx.assets.font.draw(
                 framebuffer,
                 &ui_camera,
+                &format!("score: {}", results.score),
+                vec2::splat(geng::TextAlign::CENTER),
+                mat3::translate(vec2(0.0, -1.5)),
+                Rgba::WHITE,
+            );
+            self.ctx.assets.font.draw(
+                framebuffer,
+                &ui_camera,
                 &"time survived:",
                 vec2::splat(geng::TextAlign::CENTER),
-                mat3::translate(vec2(0.0, -1.5)) * mat3::scale_uniform(0.5),
+                mat3::translate(vec2(0.0, -2.5)) * mat3::scale_uniform(0.5),
                 Rgba::WHITE,
             );
             let millis = (results.time * 1000.0).round() as i64;
@@ -731,7 +746,7 @@ impl geng::State for Game {
                 &ui_camera,
                 &format!("{:02}:{:02}.{:03}", mins, secs, millis),
                 vec2::splat(geng::TextAlign::CENTER),
-                mat3::translate(vec2(0.0, -2.0)) * mat3::scale_uniform(0.5),
+                mat3::translate(vec2(0.0, -3.0)) * mat3::scale_uniform(0.5),
                 Rgba::WHITE,
             );
 
@@ -740,18 +755,47 @@ impl geng::State for Game {
                 &ui_camera,
                 "Press R to restart",
                 vec2::splat(geng::TextAlign::CENTER),
-                mat3::translate(vec2(0.0, -3.0)) * mat3::scale_uniform(0.5),
+                mat3::translate(vec2(0.0, -4.0)) * mat3::scale_uniform(0.5),
                 Rgba::WHITE,
             );
-        } else if !self.player_moved {
+        } else {
+            let millis = (self.time * 1000.0).round() as i64;
+            let secs = millis / 1000;
+            let mins = secs / 60;
+            let secs = secs % 60;
+            let millis = millis % 1000;
+            let framebuffer_size = framebuffer.size().map(|x| x as f32);
             self.ctx.assets.font.draw(
                 framebuffer,
                 &ui_camera,
-                &"Use WASD/Arrows to move",
-                vec2::splat(geng::TextAlign::CENTER),
-                mat3::scale_uniform(0.5),
+                &format!("{:02}:{:02}.{:03}", mins, secs, millis),
+                vec2(geng::TextAlign::RIGHT, geng::TextAlign::TOP),
+                mat3::translate(
+                    ui_camera.screen_to_world(framebuffer_size, framebuffer_size) - vec2(0.5, 0.5),
+                ) * mat3::scale_uniform(0.5),
                 Rgba::WHITE,
             );
+            self.ctx.assets.font.draw(
+                framebuffer,
+                &ui_camera,
+                &format!("score: {}", self.score),
+                vec2(geng::TextAlign::LEFT, geng::TextAlign::TOP),
+                mat3::translate(
+                    ui_camera.screen_to_world(framebuffer_size, vec2(0.0, framebuffer_size.y))
+                        + vec2(0.5, -0.5),
+                ) * mat3::scale_uniform(0.5),
+                Rgba::WHITE,
+            );
+            if !self.player_moved {
+                self.ctx.assets.font.draw(
+                    framebuffer,
+                    &ui_camera,
+                    &"Use WASD/Arrows to move",
+                    vec2::splat(geng::TextAlign::CENTER),
+                    mat3::scale_uniform(0.5),
+                    Rgba::WHITE,
+                );
+            }
         }
     }
 }

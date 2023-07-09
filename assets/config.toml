@@ -18,7 +18,7 @@ time = 5
 multiplier = 1.5
 
 [weights]
-food = 70
+food = 200
 reverse = 10
 snake_speed_up = 5
 snake_speed_down = 10
