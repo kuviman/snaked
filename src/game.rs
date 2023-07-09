@@ -28,6 +28,7 @@ pub struct Game {
     snake_speed_modifier: HashMap<Id, SnakeSpeedModifier>,
     results: Option<Results>,
     alternate_move: usize,
+    player_moved: bool,
 }
 
 impl Game {
@@ -76,6 +77,7 @@ impl Game {
             snake_reversing: default(),
             alternate_move: 0,
             time: 0.0,
+            player_moved: false,
         }
     }
 
@@ -143,6 +145,7 @@ impl Game {
         if self.next_player_move > 0.0 {
             return;
         }
+        self.player_moved = true;
         self.next_player_move = 1.0 / self.ctx.assets.config.player_speed;
         let player_pos = self.map.iter().find(|(_, cell)| {
             if let MapCell::Player(id) = cell {
@@ -553,6 +556,7 @@ impl geng::State for Game {
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         let colors = &self.ctx.assets.config.colors;
+        let textures = &self.ctx.assets.textures;
         ugli::clear(framebuffer, Some(colors.background), None, None);
         let item_color = |item: &Item| match item {
             Item::Food => colors.food,
@@ -560,6 +564,13 @@ impl geng::State for Game {
             Item::SnakeSpeedUp => colors.snake_speed_up,
             Item::SnakeSpeedDown => colors.snake_speed_down,
             Item::SnakeSplit => colors.snake_split,
+        };
+        let item_texture = |item: &Item| match item {
+            Item::Food => &textures.food,
+            Item::Reverse => &textures.reverse,
+            Item::SnakeSpeedUp => &textures.speedup,
+            Item::SnakeSpeedDown => &textures.speeddown,
+            Item::SnakeSplit => &textures.split,
         };
         let snake_ends: HashMap<Id, (vec2<usize>, vec2<usize>)> = self
             .snake_ids()
@@ -623,7 +634,6 @@ impl geng::State for Game {
         }
 
         for (pos, cell) in self.map.iter() {
-            let textures = &self.ctx.assets.textures;
             let texture = match cell {
                 MapCell::SnakePart {
                     snake_id,
@@ -636,13 +646,7 @@ impl geng::State for Game {
                     }
                 }
                 MapCell::Player(_) => &textures.player,
-                MapCell::Item(item) => match item {
-                    Item::Food => &textures.food,
-                    Item::Reverse => &textures.reverse,
-                    Item::SnakeSpeedUp => &textures.speedup,
-                    Item::SnakeSpeedDown => &textures.speeddown,
-                    Item::SnakeSplit => &textures.split,
-                },
+                MapCell::Item(item) => item_texture(item),
                 _ => continue,
             };
             let aabb = Aabb2::point(pos.map(|x| x as f32))
@@ -653,14 +657,33 @@ impl geng::State for Game {
                 &draw2d::TexturedQuad::new(aabb, texture),
             );
         }
+        let ui_camera = geng::Camera2d {
+            center: vec2::ZERO,
+            rotation: Angle::ZERO,
+            fov: self.ctx.assets.config.ui_fov,
+        };
         if let Some(item) = &self.held_item {
+            let pos = vec2(
+                self.map.size().x as f32 / 2.0,
+                self.map.size().y as f32 + 2.0,
+            );
             self.ctx.geng.draw2d().draw2d(
                 framebuffer,
-                &geng::PixelPerfectCamera,
-                &draw2d::Quad::new(
-                    Aabb2::ZERO.extend_positive(vec2::splat(32.0)),
-                    item_color(item),
+                &self.camera,
+                &draw2d::TexturedQuad::new(
+                    Aabb2::ZERO
+                        .extend_symmetric(vec2::splat(0.5))
+                        .translate(pos),
+                    item_texture(item),
                 ),
+            );
+            self.ctx.assets.font.draw(
+                framebuffer,
+                &self.camera,
+                &"SPACE to use",
+                vec2::splat(geng::TextAlign::LEFT),
+                mat3::translate(pos + vec2(1.0, -0.5)),
+                Rgba::WHITE,
             );
         }
         if self.ctx.cli.editor {
@@ -681,11 +704,6 @@ impl geng::State for Game {
                 "You WON! WOW"
             } else {
                 "You LOST! LUL"
-            };
-            let ui_camera = geng::Camera2d {
-                center: vec2::ZERO,
-                rotation: Angle::ZERO,
-                fov: self.ctx.assets.config.ui_fov,
             };
             self.ctx.assets.font.draw(
                 framebuffer,
@@ -723,6 +741,15 @@ impl geng::State for Game {
                 "Press R to restart",
                 vec2::splat(geng::TextAlign::CENTER),
                 mat3::translate(vec2(0.0, -3.0)) * mat3::scale_uniform(0.5),
+                Rgba::WHITE,
+            );
+        } else if !self.player_moved {
+            self.ctx.assets.font.draw(
+                framebuffer,
+                &ui_camera,
+                &"Use WASD/Arrows to move",
+                vec2::splat(geng::TextAlign::CENTER),
+                mat3::scale_uniform(0.5),
                 Rgba::WHITE,
             );
         }
