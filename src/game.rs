@@ -557,23 +557,8 @@ impl geng::State for Game {
             .map(|id| (id, (snake::head(id, &self.map), snake::tail(id, &self.map))))
             .collect();
         for (pos, cell) in self.map.iter() {
-            // if snake_ends.values().any(|&(head, _)| {
-            //     self.map.distance(pos, head) <= self.ctx.assets.config.snake_vision
-            // }) {
-            //     self.ctx.geng.draw2d().draw2d(
-            //         framebuffer,
-            //         &self.camera,
-            //         &draw2d::Quad::new(
-            //             Aabb2::point(pos.map(|x| x as f32)).extend_uniform(0.5),
-            //             colors.snake_vision,
-            //         ),
-            //     );
-            // }
-
             let color = match *cell {
-                MapCell::Empty => continue,
                 MapCell::Wall => colors.wall,
-                MapCell::Player(_id) => colors.player,
                 MapCell::SnakePart {
                     snake_id,
                     segment_index: idx,
@@ -590,7 +575,7 @@ impl geng::State for Game {
                             % colors.snake.len()]
                     }
                 }
-                MapCell::Item(ref item) => item_color(item),
+                _ => continue,
             };
             let mut aabb = Aabb2::point(pos.map(|x| x as f32))
                 .extend_uniform(0.5 - self.ctx.assets.config.cell_margin);
@@ -624,6 +609,35 @@ impl geng::State for Game {
                 framebuffer,
                 &self.camera,
                 &draw2d::Quad::new(aabb, color),
+            );
+        }
+
+        for (pos, cell) in self.map.iter() {
+            let textures = &self.ctx.assets.textures;
+            let texture = match cell {
+                MapCell::SnakePart { snake_id, segment_index } => {
+                    if pos == snake_ends[snake_id].0 {
+                        &textures.snek
+                    } else {
+                        continue;
+                    }
+                }
+                MapCell::Player(_) => &textures.player,
+                MapCell::Item(item) => match item {
+                    Item::Food => &textures.food,
+                    Item::Reverse => &textures.reverse,
+                    Item::SnakeSpeedUp => &textures.speedup,
+                    Item::SnakeSpeedDown => &textures.speeddown,
+                    Item::SnakeSplit => &textures.split,
+                },
+                _ => continue,
+            };
+            let aabb = Aabb2::point(pos.map(|x| x as f32))
+                .extend_uniform(0.5 - self.ctx.assets.config.cell_margin);
+            self.ctx.geng.draw2d().draw2d(
+                framebuffer,
+                &self.camera,
+                &draw2d::TexturedQuad::new(aabb, texture),
             );
         }
         if let Some(item) = &self.held_item {

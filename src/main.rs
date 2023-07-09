@@ -78,11 +78,30 @@ pub struct Config {
 }
 
 #[derive(geng::asset::Load)]
+pub struct Textures {
+    #[load(options(filter = "ugli::Filter::Nearest"))]
+    pub snek: ugli::Texture,
+    #[load(options(filter = "ugli::Filter::Nearest"))]
+    pub food: ugli::Texture,
+    #[load(options(filter = "ugli::Filter::Nearest"))]
+    pub player: ugli::Texture,
+    #[load(options(filter = "ugli::Filter::Nearest"))]
+    pub reverse: ugli::Texture,
+    #[load(options(filter = "ugli::Filter::Nearest"))]
+    pub speeddown: ugli::Texture,
+    #[load(options(filter = "ugli::Filter::Nearest"))]
+    pub speedup: ugli::Texture,
+    #[load(options(filter = "ugli::Filter::Nearest"))]
+    pub split: ugli::Texture,
+}
+
+#[derive(geng::asset::Load)]
 pub struct Assets {
     #[load(path = "font/PixeloidSansBold-PKnYd.ttf")]
     pub font: geng::Font,
     pub map: String,
     pub config: Config,
+    pub textures: Textures,
 }
 
 #[derive(Clone)]
