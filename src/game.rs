@@ -40,7 +40,7 @@ pub struct Game {
     player_moved: bool,
     score: usize,
     particles: Vec<Particle>,
-    music: geng::SoundEffect,
+    music: Option<geng::SoundEffect>,
     show_ui: bool,
 }
 
@@ -59,11 +59,27 @@ impl Game {
             t: 0.0,
         });
     }
+    fn toggle_music(&mut self) {
+        if self.music.is_some() {
+            self.stop_music();
+        } else {
+            self.start_music();
+        }
+    }
+    fn stop_music(&mut self) {
+        if let Some(mut music) = self.music.take() {
+            music.stop();
+        }
+    }
+    fn start_music(&mut self) {
+        self.stop_music();
+        let mut music = self.ctx.assets.music.effect();
+        music.set_volume(self.ctx.assets.config.music_volume);
+        music.play();
+        self.music = Some(music);
+    }
     pub fn new(ctx: &Context) -> Self {
         ctx.assets.sfx.start.play();
-
-        let mut music = ctx.assets.music.effect();
-        music.set_volume(ctx.assets.config.music_volume);
 
         let mut map = Map::parse(&ctx.assets.map);
         let (pos, _) = map
@@ -110,7 +126,7 @@ impl Game {
             time: 0.0,
             player_moved: false,
             score: 0,
-            music,
+            music: None,
             show_ui: true,
         }
     }
@@ -181,7 +197,7 @@ impl Game {
         }
         if !self.player_moved {
             self.player_moved = true;
-            self.music.play();
+            self.start_music();
         }
         self.next_player_move = 1.0 / self.ctx.assets.config.player_speed;
         let player_pos = self.map.iter().find(|(_, cell)| {
@@ -342,7 +358,7 @@ impl Game {
 
 impl Drop for Game {
     fn drop(&mut self) {
-        self.music.stop();
+        self.stop_music();
     }
 }
 
@@ -370,7 +386,7 @@ impl geng::State for Game {
                 }) {
                     self.results = Some(self.results());
                     self.show_ui = true;
-                    self.music.stop();
+                    self.stop_music();
                     self.ctx.assets.sfx.end.play();
                 }
             }
@@ -612,6 +628,9 @@ impl geng::State for Game {
                 if let Some(pos) = self.hovered_cell() {
                     self.map[pos] = MapCell::Empty;
                 }
+            }
+            geng::Event::KeyPress { key: geng::Key::M } => {
+                self.toggle_music();
             }
             geng::Event::KeyPress {
                 key: geng::Key::Tab,
