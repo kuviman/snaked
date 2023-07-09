@@ -648,6 +648,9 @@ impl geng::State for Game {
                     self.map[pos] = MapCell::Empty;
                 }
             }
+            geng::Event::KeyPress { key: geng::Key::F } => {
+                self.ctx.geng.window().toggle_fullscreen();
+            }
             geng::Event::KeyPress { key: geng::Key::M } => {
                 self.toggle_music();
             }
