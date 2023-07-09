@@ -24,6 +24,7 @@ pub struct Game {
     next_player_move: f64,
     next_item: f64,
     snake_grow: HashMap<Id, usize>,
+    snake_reversing: HashMap<Id, u32>,
     snake_speed_modifier: HashMap<Id, SnakeSpeedModifier>,
     results: Option<Results>,
     alternate_move: usize,
@@ -70,6 +71,7 @@ impl Game {
                 res.insert(snake_id, ctx.assets.config.start_snake_size - 1);
                 res
             },
+            snake_reversing: default(),
             alternate_move: 0,
             time: 0.0,
         }
@@ -196,19 +198,22 @@ impl Game {
                     } if snake_id == id => segment_index,
                     _ => unreachable!(),
                 };
-                for (_pos, cell) in self.map.iter_mut() {
-                    match *cell {
-                        MapCell::SnakePart {
-                            snake_id,
-                            segment_index,
-                        } if snake_id == id => {
-                            *cell = MapCell::SnakePart {
-                                snake_id,
-                                segment_index: head_idx - segment_index,
-                            }
-                        }
-                        _ => {}
-                    }
+                // for (_pos, cell) in self.map.iter_mut() {
+                //     match *cell {
+                //         MapCell::SnakePart {
+                //             snake_id,
+                //             segment_index,
+                //         } if snake_id == id => {
+                //             *cell = MapCell::SnakePart {
+                //                 snake_id,
+                //                 segment_index: head_idx - segment_index,
+                //             }
+                //         }
+                //         _ => {}
+                //     }
+                // }
+                if head_idx > 0 {
+                    self.snake_reversing.insert(id, head_idx - 1);
                 }
                 self.ai_state.remove(&id);
             }
@@ -315,39 +320,69 @@ impl geng::State for Game {
             let next_move = self.next_snake_move.entry(id).or_default();
             *next_move -= delta_time;
             if *next_move < 0.0 {
-                *next_move = 1.0
-                    / self.ctx.assets.config.snake_speed
-                    / self
-                        .snake_speed_modifier
-                        .get(&id)
-                        .map_or(1.0, |modifier| modifier.multiplier);
-
-                let snake_grow = self.snake_grow.entry(id).or_default();
-                match snake::go_ai(
-                    id,
-                    &self.ctx.assets.config,
-                    &mut self.map,
-                    self.ai_state.entry(id).or_default(),
-                    *snake_grow == 0,
-                ) {
-                    Ok(Some(item)) => {
-                        self.use_item(Some(id), item);
-                        self.spawn_item();
+                if let Some(next_eat_index) = self.snake_reversing.remove(&id) {
+                    *next_move = 1.0 / self.ctx.assets.config.snake_reverse_speed;
+                    let head_pos = snake::head(id, &self.map);
+                    let head_index = match self.map[head_pos] {
+                        MapCell::SnakePart {
+                            snake_id,
+                            segment_index,
+                        } if snake_id == id => segment_index,
+                        _ => unreachable!(),
+                    };
+                    let next = self
+                        .map
+                        .neighbors(head_pos)
+                        .find(|&next| match self.map[next] {
+                            MapCell::SnakePart {
+                                snake_id,
+                                segment_index,
+                            } => snake_id == id && segment_index == next_eat_index,
+                            _ => false,
+                        });
+                    if let Some(next) = next {
+                        self.map[next] = MapCell::SnakePart {
+                            snake_id: id,
+                            segment_index: head_index + 1,
+                        };
+                        if next_eat_index > 0 {
+                            self.snake_reversing.insert(id, next_eat_index - 1);
+                        }
                     }
-                    Ok(None) => {}
-                    Err(()) => {
-                        for (_, cell) in self.map.iter_mut() {
-                            if let MapCell::SnakePart { snake_id, .. } = *cell {
-                                if snake_id == id {
-                                    *cell = MapCell::Empty;
+                } else {
+                    *next_move = 1.0
+                        / self.ctx.assets.config.snake_speed
+                        / self
+                            .snake_speed_modifier
+                            .get(&id)
+                            .map_or(1.0, |modifier| modifier.multiplier);
+                    let snake_grow = self.snake_grow.entry(id).or_default();
+                    match snake::go_ai(
+                        id,
+                        &self.ctx.assets.config,
+                        &mut self.map,
+                        self.ai_state.entry(id).or_default(),
+                        *snake_grow == 0,
+                    ) {
+                        Ok(Some(item)) => {
+                            self.use_item(Some(id), item);
+                            self.spawn_item();
+                        }
+                        Ok(None) => {}
+                        Err(()) => {
+                            for (_, cell) in self.map.iter_mut() {
+                                if let MapCell::SnakePart { snake_id, .. } = *cell {
+                                    if snake_id == id {
+                                        *cell = MapCell::Empty;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                let snake_grow = self.snake_grow.entry(id).or_default();
-                if *snake_grow > 0 {
-                    *snake_grow -= 1;
+                    let snake_grow = self.snake_grow.entry(id).or_default();
+                    if *snake_grow > 0 {
+                        *snake_grow -= 1;
+                    }
                 }
             }
         }
@@ -357,6 +392,7 @@ impl geng::State for Game {
             self.next_item = self.ctx.assets.config.new_item_time;
             self.spawn_item();
         }
+
         self.next_player_move -= delta_time;
         if self.next_player_move < 0.0 {
             let mut dir = Vec::new();

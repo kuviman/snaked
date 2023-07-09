@@ -73,6 +73,7 @@ pub struct Config {
     pub time_scale: f64,
     pub max_items: usize,
     pub snake_wake_up_time: f64,
+    pub snake_reverse_speed: f64,
 }
 
 #[derive(geng::asset::Load)]

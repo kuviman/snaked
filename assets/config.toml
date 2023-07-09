@@ -9,6 +9,7 @@ food_value = 2
 time_scale = 1
 max_items = 10
 snake_wake_up_time = 1
+snake_reverse_speed = 25
 
 [items.snake_speed]
 time = 5
