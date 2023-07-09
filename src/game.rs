@@ -41,6 +41,7 @@ pub struct Game {
     score: usize,
     particles: Vec<Particle>,
     music: geng::SoundEffect,
+    show_ui: bool,
 }
 
 impl Game {
@@ -110,6 +111,7 @@ impl Game {
             player_moved: false,
             score: 0,
             music,
+            show_ui: true,
         }
     }
 
@@ -367,6 +369,7 @@ impl geng::State for Game {
                     }
                 }) {
                     self.results = Some(self.results());
+                    self.show_ui = true;
                     self.music.stop();
                     self.ctx.assets.sfx.end.play();
                 }
@@ -610,6 +613,11 @@ impl geng::State for Game {
                     self.map[pos] = MapCell::Empty;
                 }
             }
+            geng::Event::KeyPress {
+                key: geng::Key::Tab,
+            } => {
+                self.show_ui = !self.show_ui;
+            }
             geng::Event::KeyPress { key: geng::Key::R } => {
                 *self = Self::new(&self.ctx);
             }
@@ -813,59 +821,69 @@ impl geng::State for Game {
         }
 
         if let Some(results) = &self.results {
-            let text = if results.win {
-                "You WON! WOW"
-            } else {
-                "You LOST! LUL"
-            };
-            let mut ui_camera = ui_camera;
-            ui_camera.center.y -= 2.0;
-            self.ctx.assets.font.draw(
-                framebuffer,
-                &ui_camera,
-                text,
-                vec2::splat(geng::TextAlign::CENTER),
-                mat3::scale_uniform(1.0),
-                Rgba::WHITE,
-            );
-            self.ctx.assets.font.draw(
-                framebuffer,
-                &ui_camera,
-                &format!("score: {}", results.score),
-                vec2::splat(geng::TextAlign::CENTER),
-                mat3::translate(vec2(0.0, -1.5)),
-                Rgba::WHITE,
-            );
-            self.ctx.assets.font.draw(
-                framebuffer,
-                &ui_camera,
-                &"time survived:",
-                vec2::splat(geng::TextAlign::CENTER),
-                mat3::translate(vec2(0.0, -2.5)) * mat3::scale_uniform(0.5),
-                Rgba::WHITE,
-            );
-            let millis = (results.time * 1000.0).round() as i64;
-            let secs = millis / 1000;
-            let mins = secs / 60;
-            let secs = secs % 60;
-            let millis = millis % 1000;
-            self.ctx.assets.font.draw(
-                framebuffer,
-                &ui_camera,
-                &format!("{:02}:{:02}.{:03}", mins, secs, millis),
-                vec2::splat(geng::TextAlign::CENTER),
-                mat3::translate(vec2(0.0, -3.0)) * mat3::scale_uniform(0.5),
-                Rgba::WHITE,
-            );
+            if self.show_ui {
+                let text = if results.win {
+                    "You WON! WOW"
+                } else {
+                    "You LOST! LUL"
+                };
+                let mut ui_camera = ui_camera;
+                ui_camera.center.y -= 2.0;
+                self.ctx.assets.font.draw(
+                    framebuffer,
+                    &ui_camera,
+                    text,
+                    vec2::splat(geng::TextAlign::CENTER),
+                    mat3::scale_uniform(1.0),
+                    Rgba::WHITE,
+                );
+                self.ctx.assets.font.draw(
+                    framebuffer,
+                    &ui_camera,
+                    &format!("score: {}", results.score),
+                    vec2::splat(geng::TextAlign::CENTER),
+                    mat3::translate(vec2(0.0, -1.5)),
+                    Rgba::WHITE,
+                );
+                self.ctx.assets.font.draw(
+                    framebuffer,
+                    &ui_camera,
+                    &"time survived:",
+                    vec2::splat(geng::TextAlign::CENTER),
+                    mat3::translate(vec2(0.0, -2.5)) * mat3::scale_uniform(0.5),
+                    Rgba::WHITE,
+                );
+                let millis = (results.time * 1000.0).round() as i64;
+                let secs = millis / 1000;
+                let mins = secs / 60;
+                let secs = secs % 60;
+                let millis = millis % 1000;
+                self.ctx.assets.font.draw(
+                    framebuffer,
+                    &ui_camera,
+                    &format!("{:02}:{:02}.{:03}", mins, secs, millis),
+                    vec2::splat(geng::TextAlign::CENTER),
+                    mat3::translate(vec2(0.0, -3.0)) * mat3::scale_uniform(0.5),
+                    Rgba::WHITE,
+                );
 
-            self.ctx.assets.font.draw(
-                framebuffer,
-                &ui_camera,
-                "Press R to restart",
-                vec2::splat(geng::TextAlign::CENTER),
-                mat3::translate(vec2(0.0, -4.0)) * mat3::scale_uniform(0.5),
-                Rgba::WHITE,
-            );
+                self.ctx.assets.font.draw(
+                    framebuffer,
+                    &ui_camera,
+                    "press R to restart",
+                    vec2::splat(geng::TextAlign::CENTER),
+                    mat3::translate(vec2(0.0, -4.0)) * mat3::scale_uniform(0.5),
+                    Rgba::WHITE,
+                );
+                self.ctx.assets.font.draw(
+                    framebuffer,
+                    &ui_camera,
+                    "press Tab to hide this screen",
+                    vec2::splat(geng::TextAlign::CENTER),
+                    mat3::translate(vec2(0.0, -5.0)) * mat3::scale_uniform(0.5),
+                    Rgba::WHITE,
+                );
+            }
         } else {
             let millis = (self.time * 1000.0).round() as i64;
             let secs = millis / 1000;
