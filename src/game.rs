@@ -26,6 +26,7 @@ pub struct Game {
     snake_grow: HashMap<Id, usize>,
     snake_speed_modifier: HashMap<Id, SnakeSpeedModifier>,
     results: Option<Results>,
+    alternate_move: usize,
 }
 
 impl Game {
@@ -65,6 +66,7 @@ impl Game {
                 res.insert(snake_id, ctx.assets.config.start_snake_size - 1);
                 res
             },
+            alternate_move: 0,
             time: 0.0,
         }
     }
@@ -349,7 +351,7 @@ impl geng::State for Game {
         }
         self.next_player_move -= delta_time;
         if self.next_player_move < 0.0 {
-            let mut dir = None;
+            let mut dir = Vec::new();
             if self
                 .ctx
                 .assets
@@ -359,7 +361,7 @@ impl geng::State for Game {
                 .iter()
                 .any(|&key| self.ctx.geng.window().is_key_pressed(key))
             {
-                dir = Some(vec2(-1, 0));
+                dir.push(vec2(-1, 0));
             }
             if self
                 .ctx
@@ -370,7 +372,7 @@ impl geng::State for Game {
                 .iter()
                 .any(|&key| self.ctx.geng.window().is_key_pressed(key))
             {
-                dir = Some(vec2(1, 0));
+                dir.push(vec2(1, 0));
             }
             if self
                 .ctx
@@ -381,7 +383,7 @@ impl geng::State for Game {
                 .iter()
                 .any(|&key| self.ctx.geng.window().is_key_pressed(key))
             {
-                dir = Some(vec2(0, 1));
+                dir.push(vec2(0, 1));
             }
             if self
                 .ctx
@@ -392,11 +394,13 @@ impl geng::State for Game {
                 .iter()
                 .any(|&key| self.ctx.geng.window().is_key_pressed(key))
             {
-                dir = Some(vec2(0, -1));
+                dir.push(vec2(0, -1));
             }
-            if let Some(dir) = dir {
+            if !dir.is_empty() {
+                let dir = dir[self.alternate_move % dir.len()];
                 self.move_player(dir);
             }
+            self.alternate_move += 1;
         }
     }
     fn handle_event(&mut self, event: geng::Event) {
@@ -497,18 +501,18 @@ impl geng::State for Game {
             .map(|id| (id, (snake::head(id, &self.map), snake::tail(id, &self.map))))
             .collect();
         for (pos, cell) in self.map.iter() {
-            if snake_ends.values().any(|&(head, _)| {
-                self.map.distance(pos, head) <= self.ctx.assets.config.snake_vision
-            }) {
-                self.ctx.geng.draw2d().draw2d(
-                    framebuffer,
-                    &self.camera,
-                    &draw2d::Quad::new(
-                        Aabb2::point(pos.map(|x| x as f32)).extend_uniform(0.5),
-                        colors.snake_vision,
-                    ),
-                );
-            }
+            // if snake_ends.values().any(|&(head, _)| {
+            //     self.map.distance(pos, head) <= self.ctx.assets.config.snake_vision
+            // }) {
+            //     self.ctx.geng.draw2d().draw2d(
+            //         framebuffer,
+            //         &self.camera,
+            //         &draw2d::Quad::new(
+            //             Aabb2::point(pos.map(|x| x as f32)).extend_uniform(0.5),
+            //             colors.snake_vision,
+            //         ),
+            //     );
+            // }
 
             let color = match *cell {
                 MapCell::Empty => continue,
