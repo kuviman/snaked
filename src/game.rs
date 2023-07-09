@@ -698,7 +698,15 @@ impl geng::State for Game {
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         let colors = &self.ctx.assets.config.colors;
         let textures = &self.ctx.assets.textures;
-        ugli::clear(framebuffer, Some(colors.background), None, None);
+        ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
+        self.ctx.geng.draw2d().draw2d(
+            framebuffer,
+            &self.camera,
+            &draw2d::Quad::new(
+                Aabb2::point(vec2::splat(-0.5)).extend_positive(self.map.size().map(|x| x as f32)),
+                colors.background,
+            ),
+        );
         let item_color = |item: &Item| match item {
             Item::Food => colors.food,
             Item::Reverse => colors.reverse,

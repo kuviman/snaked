@@ -32,13 +32,13 @@ snake_speed_down = 10
 snake_split = 5
 
 [colors]
-background = "black"
+background = "#010"
 player = "red"
 food = "#f7a"
 snake_head = "green"
 snake_tail = "#030"
 snake = ["#070", "#060", "#050", "#040", "#050", "#060"]
-wall = "white"
+wall = "#aaa"
 hovered = "#7777"
 snake_vision = "#f003"
 reverse = "blue"
