@@ -78,6 +78,16 @@ pub struct Config {
 }
 
 #[derive(geng::asset::Load)]
+pub struct Sfx {
+    pub eat: geng::Sound,
+    pub ded: geng::Sound,
+    pub end: geng::Sound,
+    pub pickup: geng::Sound,
+    pub start: geng::Sound,
+    pub use_item: geng::Sound,
+}
+
+#[derive(geng::asset::Load)]
 pub struct Textures {
     #[load(options(filter = "ugli::Filter::Nearest"))]
     pub snek: ugli::Texture,
@@ -102,6 +112,7 @@ pub struct Assets {
     pub map: String,
     pub config: Config,
     pub textures: Textures,
+    pub sfx: Sfx,
 }
 
 #[derive(Clone)]

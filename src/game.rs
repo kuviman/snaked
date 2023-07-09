@@ -32,6 +32,8 @@ pub struct Game {
 
 impl Game {
     pub fn new(ctx: &Context) -> Self {
+        ctx.assets.sfx.start.play();
+
         let mut map = Map::parse(&ctx.assets.map);
         let (pos, _) = map
             .iter()
@@ -160,6 +162,7 @@ impl Game {
                     if self.held_item.is_some() {
                         return;
                     }
+                    self.ctx.assets.sfx.pickup.play();
                     self.held_item = Some(item.clone());
                 }
                 _ => return,
@@ -189,8 +192,10 @@ impl Game {
         match item {
             Item::Food => {
                 *self.snake_grow.entry(id).or_default() += self.ctx.assets.config.food_value - 1;
+                self.ctx.assets.sfx.eat.play();
             }
             Item::Reverse => {
+                self.ctx.assets.sfx.use_item.play();
                 let head_idx = match self.map[snake::head(id, &self.map)] {
                     MapCell::SnakePart {
                         snake_id,
@@ -218,6 +223,7 @@ impl Game {
                 self.ai_state.remove(&id);
             }
             Item::SnakeSpeedUp => {
+                self.ctx.assets.sfx.use_item.play();
                 self.snake_speed_modifier.insert(
                     id,
                     SnakeSpeedModifier {
@@ -227,6 +233,7 @@ impl Game {
                 );
             }
             Item::SnakeSpeedDown => {
+                self.ctx.assets.sfx.use_item.play();
                 self.snake_speed_modifier.insert(
                     id,
                     SnakeSpeedModifier {
@@ -236,6 +243,7 @@ impl Game {
                 );
             }
             Item::SnakeSplit => {
+                self.ctx.assets.sfx.use_item.play();
                 let mut min_max: HashMap<Id, (u32, u32)> = HashMap::new();
                 for (_pos, cell) in self.map.iter() {
                     if let MapCell::SnakePart {
@@ -306,6 +314,7 @@ impl geng::State for Game {
                     }
                 }) {
                     self.results = Some(self.results());
+                    self.ctx.assets.sfx.end.play();
                 }
             }
         }
@@ -370,6 +379,7 @@ impl geng::State for Game {
                         }
                         Ok(None) => {}
                         Err(()) => {
+                            self.ctx.assets.sfx.ded.play();
                             for (_, cell) in self.map.iter_mut() {
                                 if let MapCell::SnakePart { snake_id, .. } = *cell {
                                     if snake_id == id {
@@ -615,7 +625,10 @@ impl geng::State for Game {
         for (pos, cell) in self.map.iter() {
             let textures = &self.ctx.assets.textures;
             let texture = match cell {
-                MapCell::SnakePart { snake_id, segment_index } => {
+                MapCell::SnakePart {
+                    snake_id,
+                    segment_index,
+                } => {
                     if pos == snake_ends[snake_id].0 {
                         &textures.snek
                     } else {
@@ -685,7 +698,7 @@ impl geng::State for Game {
             self.ctx.assets.font.draw(
                 framebuffer,
                 &ui_camera,
-                &"time:",
+                &"time survived:",
                 vec2::splat(geng::TextAlign::CENTER),
                 mat3::translate(vec2(0.0, -1.5)) * mat3::scale_uniform(0.5),
                 Rgba::WHITE,
