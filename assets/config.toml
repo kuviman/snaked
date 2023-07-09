@@ -12,6 +12,12 @@ snake_wake_up_time = 1
 snake_reverse_speed = 25
 text_scale = 1
 ui_fov = 10
+particle_opacity = 0.5
+particle_size = 1
+particle_max_speed = 3
+particle_amount = 3
+particle_lifetime = 0.5
+volume = 1
 
 [items.snake_speed]
 time = 5

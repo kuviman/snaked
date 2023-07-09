@@ -58,6 +58,11 @@ pub struct Controls {
 #[derive(geng::asset::Load, Deserialize)]
 #[load(serde = "toml")]
 pub struct Config {
+    pub particle_opacity: f32,
+    pub particle_lifetime: f64,
+    pub particle_amount: usize,
+    pub particle_size: f32,
+    pub particle_max_speed: f32,
     pub ui_fov: f32,
     pub start_snake_size: usize,
     pub items: ItemsConfig,
@@ -75,6 +80,7 @@ pub struct Config {
     pub max_items: usize,
     pub snake_wake_up_time: f64,
     pub snake_reverse_speed: f64,
+    pub volume: f64,
 }
 
 #[derive(geng::asset::Load)]
@@ -90,19 +96,19 @@ pub struct Sfx {
 #[derive(geng::asset::Load)]
 pub struct Textures {
     #[load(options(filter = "ugli::Filter::Nearest"))]
-    pub snek: ugli::Texture,
+    pub snek: Rc<ugli::Texture>,
     #[load(options(filter = "ugli::Filter::Nearest"))]
-    pub food: ugli::Texture,
+    pub food: Rc<ugli::Texture>,
     #[load(options(filter = "ugli::Filter::Nearest"))]
-    pub player: ugli::Texture,
+    pub player: Rc<ugli::Texture>,
     #[load(options(filter = "ugli::Filter::Nearest"))]
-    pub reverse: ugli::Texture,
+    pub reverse: Rc<ugli::Texture>,
     #[load(options(filter = "ugli::Filter::Nearest"))]
-    pub speeddown: ugli::Texture,
+    pub speeddown: Rc<ugli::Texture>,
     #[load(options(filter = "ugli::Filter::Nearest"))]
-    pub speedup: ugli::Texture,
+    pub speedup: Rc<ugli::Texture>,
     #[load(options(filter = "ugli::Filter::Nearest"))]
-    pub split: ugli::Texture,
+    pub split: Rc<ugli::Texture>,
 }
 
 #[derive(geng::asset::Load)]
@@ -136,6 +142,7 @@ fn main() {
             .load(run_dir().join("assets"))
             .await
             .unwrap();
+        geng.audio().set_volume(assets.config.volume);
         let ctx = Context {
             geng: geng.clone(),
             assets: Rc::new(assets),

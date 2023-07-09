@@ -12,6 +12,14 @@ pub struct Results {
     score: usize,
 }
 
+struct Particle {
+    texture: Rc<ugli::Texture>,
+    size: f32,
+    pos: vec2<f32>,
+    vel: vec2<f32>,
+    t: f32,
+}
+
 pub struct Game {
     id_gen: IdGen,
     time: f64,
@@ -31,9 +39,24 @@ pub struct Game {
     alternate_move: usize,
     player_moved: bool,
     score: usize,
+    particles: Vec<Particle>,
 }
 
 impl Game {
+    fn spawn_particle_batch(&mut self, pos: vec2<usize>, texture: Rc<ugli::Texture>) {
+        for _ in 0..self.ctx.assets.config.particle_amount {
+            self.spawn_particle(pos, texture.clone());
+        }
+    }
+    fn spawn_particle(&mut self, pos: vec2<usize>, texture: Rc<ugli::Texture>) {
+        self.particles.push(Particle {
+            texture,
+            size: self.ctx.assets.config.particle_size,
+            pos: pos.map(|x| x as f32),
+            vel: thread_rng().gen_circle(vec2::ZERO, self.ctx.assets.config.particle_max_speed),
+            t: 0.0,
+        });
+    }
     pub fn new(ctx: &Context) -> Self {
         ctx.assets.sfx.start.play();
 
@@ -51,6 +74,7 @@ impl Game {
         };
 
         Self {
+            particles: default(),
             id_gen,
             ctx: ctx.clone(),
             camera: Camera2d {
@@ -309,6 +333,11 @@ impl Game {
 impl geng::State for Game {
     fn update(&mut self, delta_time: f64) {
         let delta_time = delta_time * self.ctx.assets.config.time_scale;
+        for particle in &mut self.particles {
+            particle.t += (delta_time / self.ctx.assets.config.particle_lifetime) as f32;
+            particle.pos += particle.vel * delta_time as f32;
+        }
+        self.particles.retain(|p| p.t < 1.0);
         self.time += delta_time;
         if !self.ctx.cli.editor && self.results.is_none() {
             if self.player_id.is_none() {
@@ -373,6 +402,17 @@ impl geng::State for Game {
                             .snake_speed_modifier
                             .get(&id)
                             .map_or(1.0, |modifier| modifier.multiplier);
+
+                    if let Some(modifier) = self.snake_speed_modifier.get(&id) {
+                        let texture = if modifier.multiplier > 1.0 {
+                            &self.ctx.assets.textures.speedup
+                        } else {
+                            &self.ctx.assets.textures.speeddown
+                        };
+                        self.spawn_particle(snake::head(id, &self.map), texture.clone());
+                    }
+                    let textures = &self.ctx.assets.textures;
+
                     let snake_grow = self.snake_grow.entry(id).or_default();
                     match snake::go_ai(
                         id,
@@ -382,18 +422,35 @@ impl geng::State for Game {
                         *snake_grow == 0,
                     ) {
                         Ok(Some(item)) => {
+                            self.spawn_particle_batch(
+                                snake::head(id, &self.map),
+                                match item {
+                                    Item::Food => &textures.food,
+                                    Item::Reverse => &textures.reverse,
+                                    Item::SnakeSpeedUp => &textures.speedup,
+                                    Item::SnakeSpeedDown => &textures.speeddown,
+                                    Item::SnakeSplit => &textures.split,
+                                }
+                                .clone(),
+                            );
                             self.use_item(Some(id), item);
                             self.spawn_item();
                         }
                         Ok(None) => {}
                         Err(()) => {
                             self.ctx.assets.sfx.ded.play();
-                            for (_, cell) in self.map.iter_mut() {
+                            let mut explosion_positions = Vec::new();
+                            for (pos, cell) in self.map.iter_mut() {
                                 if let MapCell::SnakePart { snake_id, .. } = *cell {
                                     if snake_id == id {
                                         *cell = MapCell::Empty;
+                                        explosion_positions.push(pos);
                                     }
                                 }
+                            }
+                            for pos in explosion_positions {
+                                let tex = self.ctx.assets.textures.snek.clone();
+                                self.spawn_particle(pos, tex);
                             }
                         }
                     }
@@ -482,7 +539,21 @@ impl geng::State for Game {
                         let snake_id = self.snake_ids().into_iter().min_by_key(|&id| {
                             self.map.distance(snake::head(id, &self.map), player_pos)
                         });
-                        self.use_item(snake_id, item);
+                        if let Some(snake_id) = snake_id {
+                            let textures = &self.ctx.assets.textures;
+                            self.spawn_particle_batch(
+                                snake::head(snake_id, &self.map),
+                                match item {
+                                    Item::Food => &textures.food,
+                                    Item::Reverse => &textures.reverse,
+                                    Item::SnakeSpeedUp => &textures.speedup,
+                                    Item::SnakeSpeedDown => &textures.speeddown,
+                                    Item::SnakeSplit => &textures.split,
+                                }
+                                .clone(),
+                            );
+                            self.use_item(Some(snake_id), item);
+                        }
                     }
                 }
             }
@@ -659,9 +730,27 @@ impl geng::State for Game {
             self.ctx.geng.draw2d().draw2d(
                 framebuffer,
                 &self.camera,
-                &draw2d::TexturedQuad::new(aabb, texture),
+                &draw2d::TexturedQuad::new(aabb, &**texture),
             );
         }
+
+        for particle in &self.particles {
+            self.ctx.geng.draw2d().draw2d(
+                framebuffer,
+                &self.camera,
+                &draw2d::TexturedQuad::colored(
+                    Aabb2::point(particle.pos).extend_uniform(particle.size / 2.0),
+                    &*particle.texture,
+                    Rgba::new(
+                        1.0,
+                        1.0,
+                        1.0,
+                        (1.0 - particle.t) * self.ctx.assets.config.particle_opacity,
+                    ),
+                ),
+            );
+        }
+
         let ui_camera = geng::Camera2d {
             center: vec2::ZERO,
             rotation: Angle::ZERO,
@@ -679,7 +768,7 @@ impl geng::State for Game {
                     Aabb2::ZERO
                         .extend_symmetric(vec2::splat(0.5))
                         .translate(pos),
-                    item_texture(item),
+                    &**item_texture(item),
                 ),
             );
             self.ctx.assets.font.draw(
