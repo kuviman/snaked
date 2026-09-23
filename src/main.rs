@@ -82,8 +82,8 @@ pub struct Config {
     pub max_items: usize,
     pub snake_wake_up_time: f64,
     pub snake_reverse_speed: f64,
-    pub volume: f64,
-    pub music_volume: f64,
+    pub volume: f32,
+    pub music_volume: f32,
 }
 
 #[derive(geng::asset::Load)]
@@ -140,19 +140,31 @@ pub struct CliArgs {
 }
 
 fn main() {
-    let cli: CliArgs = cli::parse();
-    Geng::run("Snaked", |geng| async move {
-        let assets: Assets = geng
-            .asset_manager()
-            .load(run_dir().join("assets"))
-            .await
-            .unwrap();
-        geng.audio().set_volume(assets.config.volume);
-        let ctx = Context {
-            geng: geng.clone(),
-            assets: Rc::new(assets),
-            cli: Rc::new(cli),
-        };
-        geng.run_state(Game::new(&ctx)).await;
-    });
+    geng::setup_panic_handler();
+    let cli: CliArgs = if cfg!(target_arch = "wasm32") {
+        CliArgs { editor: false }
+    } else {
+        cli::parse()
+    };
+    Geng::run_with(
+        &{
+            let mut opt = geng::ContextOptions::default();
+            opt.window.title = "Snaked".to_owned();
+            opt
+        },
+        |geng| async move {
+            let assets: Assets = geng
+                .asset_manager()
+                .load(run_dir().join("assets"))
+                .await
+                .unwrap();
+            geng.audio().master_volume().set_value(assets.config.volume);
+            let ctx = Context {
+                geng: geng.clone(),
+                assets: Rc::new(assets),
+                cli: Rc::new(cli),
+            };
+            geng.run_state(Game::new(&ctx)).await;
+        },
+    );
 }

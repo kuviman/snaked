@@ -76,7 +76,11 @@ impl Game {
     }
     fn start_music(&mut self) {
         self.stop_music();
-        let mut music = self.ctx.assets.music.effect();
+        let mut music = self
+            .ctx
+            .assets
+            .music
+            .effect(self.ctx.geng.audio().default_type());
         music.set_volume(self.ctx.assets.config.music_volume);
         music.play();
         self.music = Some(music);
@@ -109,7 +113,9 @@ impl Game {
             camera: Camera2d {
                 center: camera_center,
                 rotation: Angle::ZERO,
-                fov: map.size().y as f32 + ctx.assets.config.camera_margin * 2.0,
+                fov: geng::Camera2dFov::Vertical(
+                    map.size().y as f32 + ctx.assets.config.camera_margin * 2.0,
+                ),
             },
             map,
             ai_state: HashMap::new(),
@@ -830,7 +836,7 @@ impl geng::State for Game {
         let ui_camera = geng::Camera2d {
             center: vec2::ZERO,
             rotation: Angle::ZERO,
-            fov: self.ctx.assets.config.ui_fov,
+            fov: geng::Camera2dFov::Vertical(self.ctx.assets.config.ui_fov),
         };
         if let Some(item) = &self.held_item {
             let pos = vec2(
